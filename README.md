@@ -3,7 +3,7 @@
 <img width="809" height="639" alt="image" src="https://github.com/user-attachments/assets/540a5d06-204b-4342-babf-2d5395a2179b" />
 (The interface is still very much a work-in-progress, expect changes!)
 
-A launcher-only Chorizite plugin by [Raajik](https://github.com/Raajik) that browses the AC community server list and launches straight into the server you pick, instead of typing host names and ports.
+A launcher-only Chorizite plugin that browses the AC community server list and launches straight into the server you pick, instead of typing host names and ports.
 
 ## Install
 
