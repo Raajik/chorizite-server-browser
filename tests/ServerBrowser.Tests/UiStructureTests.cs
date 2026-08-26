@@ -32,7 +32,6 @@ public class UiStructureTests {
         Assert.Contains("statusDevelopment", lua);
         Assert.Contains("statusExperimental", lua);
         Assert.Contains("discord-icon", lua);
-        Assert.Contains("discord-placeholder", lua);
         Assert.Contains("plugin:OpenDiscord(server.DiscordUrl)", lua);
         Assert.Contains("e.StopPropagation()", lua);
     }
@@ -55,7 +54,7 @@ public class UiStructureTests {
 
         Assert.Contains("website-link", lua);
         Assert.Contains("plugin:OpenWebsite(server.WebsiteUrl)", lua);
-        Assert.Contains(".website-badge", rml);
+        Assert.Contains(".link-badge", rml);
         Assert.Contains(".website-link:hover", rml);
     }
 
@@ -64,7 +63,7 @@ public class UiStructureTests {
         var lua = ReadLua();
         var rml = ReadRml();
 
-        Assert.Contains("'tag website-badge hidden'", lua);
+        Assert.Contains("'tag link-badge hidden'", lua);
         Assert.DoesNotContain("website-placeholder", lua);
         Assert.Contains(".hidden { display: none; }", rml);
     }
@@ -115,7 +114,8 @@ public class UiStructureTests {
     public void FavoriteRowsCollapseToACompactCard() {
         var rml = ReadRml();
 
-        Assert.Contains(".server.favoriteServer .server-footer { display: none; }", rml);
+        Assert.Contains(".server.favoriteServer .description { display: none; }", rml);
+        Assert.Contains(".server.favoriteServer .server-badges { display: none; }", rml);
         Assert.Contains(".reorder { display: none; }", rml);
         Assert.Contains(".server.favoriteServer .reorder { display: flex;", rml);
         Assert.Matches(@"\.server\.favoriteServer \{[^}]*min-height: 0", rml);
@@ -170,22 +170,59 @@ public class UiStructureTests {
     }
 
     [Fact]
-    public void ServerCardKeepsEndpointInlineAndBadgesAtBottomRight() {
+    public void ServerCardSplitsIntoTextBadgeColumnAndStatsCube() {
         var lua = ReadLua();
         var rml = ReadRml();
 
         Assert.Contains("class = 'title-block'", lua);
         Assert.Contains("'(' .. server.Endpoint .. ')'", lua);
-        Assert.Contains("class = 'server-footer'", lua);
+        Assert.Contains("class = 'server-main'", lua);
         Assert.Contains("class = 'server-badges'", lua);
+        Assert.Contains("class = 'stats-cube'", lua);
+        Assert.Contains(".server { display: flex", rml);
+        Assert.Contains(".server-main { flex: 1", rml);
         Assert.Contains(".title-block { display: flex", rml);
-        Assert.Contains(".server-badges { display: flex", rml);
-        Assert.Contains(".discord-badge", rml);
-        Assert.Contains(".count { color: #7fdb88; font-size: 16px", rml);
-        Assert.True(lua.IndexOf("class = 'server-badges'", StringComparison.Ordinal) >
-                    lua.IndexOf("class = 'description'", StringComparison.Ordinal));
-        Assert.DoesNotContain("class = 'meta'", lua);
-        Assert.DoesNotContain("class = 'heading-tags'", lua);
+        Assert.DoesNotContain("class = 'server-footer'", lua);
+        Assert.DoesNotContain(".server-footer", rml);
+        Assert.DoesNotContain("class = 'stats'", lua);
+
+        Assert.True(lua.IndexOf("class = 'stats-cube'", StringComparison.Ordinal) >
+                    lua.IndexOf("class = 'server-badges'", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void BadgesStackVerticallyAndStatsCubeCarriesPingBand() {
+        var rml = ReadRml();
+
+        Assert.Contains(".server-badges { display: flex; flex-direction: column;", rml);
+        Assert.Matches(@"\.server-badges \.tag \{[^}]*font-size: 10px", rml);
+        Assert.Matches(@"\.stats-cube \{[^}]*border-radius", rml);
+        Assert.Matches(@"\.stats-cube \.ping \{[^}]*border-top: 1px", rml);
+        Assert.Contains(".stats-cube .count { display: block", rml);
+    }
+
+    [Fact]
+    public void WebAndDiscordRenderAsMatchingIconsOnTheTitleLine() {
+        var lua = ReadLua();
+        var rml = ReadRml();
+
+        Assert.Contains("class = 'server-links'", lua);
+        Assert.Contains("assets/web.png", lua);
+        Assert.Contains("assets/discord.png", lua);
+        Assert.Contains("'tag link-badge website-link'", lua);
+        Assert.Contains("'tag link-badge discord-icon'", lua);
+        Assert.Contains(".link-badge img { width: 14px; height: 14px; }", rml);
+        Assert.DoesNotContain("rx:Span('Web'", lua);
+    }
+
+    [Fact]
+    public void HiddenRuleIsDeclaredLastSoItBeatsTagDisplay() {
+        var rml = ReadRml();
+
+        var hidden = rml.IndexOf(".hidden { display: none; }", StringComparison.Ordinal);
+        var tag = rml.IndexOf(".tag { display: inline-block", StringComparison.Ordinal);
+
+        Assert.True(hidden > tag, ".hidden must come after .tag or hidden badges still render");
     }
 
     [Fact]

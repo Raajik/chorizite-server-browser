@@ -23,8 +23,8 @@ The last successful responses are cached locally. Player-count failure never blo
 - toggleable server favorites, pinned to the top of the list as compact cards
 - manual favorite ordering with per-row up/down arrows
 - color-coded PvE/PvP and stability/development status tags
-- clickable Discord invite badge or aligned placeholder on every server card
-- clickable `Web` badge opening the server's website, hidden when none is published
+- website and Discord icon buttons on the title line, hidden when no link exists
+- emulator, type, and status stacked in a badge column beside a population/ping cube
 - generic guidance for sparse community listings
 - per-server alternate client executable overrides
 - multiple saved accounts with current-server and default-server launch actions

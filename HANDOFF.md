@@ -13,7 +13,7 @@ This is a **standalone Chorizite launcher plugin**. It is intentionally separate
 
 ## Current version and status
 
-Current plugin version: **0.6.0**
+Current plugin version: **0.7.0**
 
 Verified on Windows 11 with:
 
@@ -93,9 +93,11 @@ If the network fetch fails, cached community XML is used. Player-count failure i
 - population-first sorting when counts are available
 - text search across name, description, and server type
 - server cards showing emulator, PvE/PvP type, status, and player count
-- full-width server cards with descriptions directly under their metadata
+- three-region server cards: flexible text column, vertical badge column, stats cube
 - endpoint shown in parentheses directly beside each server title
-- compact emulator/type/status/Discord badges at the card's bottom-right and prominent population typography
+- website and Discord icon buttons sharing the title line with the server name
+- emulator/type/status stacked vertically in a 72px column at 10px type
+- population and ping in a bordered 66px cube, ping in its own band beneath a divider
 - centered title and separate Servers/Accounts tabs
 - ICMP latency shown beside population (`N/A` when the host blocks ping)
 - red `Offline` instead of `N/A` when the host name no longer resolves
@@ -194,13 +196,13 @@ If the Windows profile is lost, Credential Manager entries are not independently
   - local settings persistence
   - launch invocation
 
-- `src/ServerBrowser/assets/discord.png`
-  - bundled Discord-style indicator
+- `src/ServerBrowser/assets/discord.png` and `web.png`
+  - bundled link icons for the title-line buttons
 - `src/ServerBrowser/assets/star-on.png` and `star-off.png`
   - bundled favorite icons (the indexed RmlUi font lacks star glyphs)
 
-- `scripts/make_discord_icon.py`
-  - reproducibly generates the bundled icon
+- `scripts/make_discord_icon.py`, `make_web_icon.py`, `make_star_icons.py`, `make_arrow_icons.py`
+  - reproducibly generate the bundled icons (requires Pillow)
 
 ## Critical settings-persistence invariant
 
@@ -257,7 +259,13 @@ An earlier 0.5.0 attempt pinned favorites with flexbox `order` to avoid moving r
 
 Do not reintroduce `order`, and be skeptical of other modern flexbox properties. `display: flex`, `flex`, `align-items`, and `justify-content` are supported and used throughout.
 
-Badges follow the same rule. The website badge toggles the `hidden` class rather than being added or removed, so the badge child list is identical for every server.
+Badges follow the same rule. The website and Discord icons toggle the `hidden` class rather than being added or removed, so the child list is identical for every server.
+
+### Stylesheet ordering hazard
+
+RmlUi resolves equal-specificity rules by source order, and `.hidden` competes directly with class rules that set `display`. `.tag { display: inline-block; }` silently defeated `.hidden { display: none; }` while `.hidden` was declared near the top, so "hidden" badges still rendered as empty boxes.
+
+`.hidden` is therefore declared **last** in the stylesheet, and `UiStructureTests.HiddenRuleIsDeclaredLastSoItBeatsTagDisplay` pins that ordering. Keep any new `display` rules above it.
 
 ## Build, test, and deploy
 

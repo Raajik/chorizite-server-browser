@@ -251,75 +251,77 @@ local function ServerRow(server, isFiltered)
     },
     onclick = function() selectServer(server) end
   }, {
-    rx:Div({ class = 'server-heading' }, {
-      rx:Span('', {
-        class = { favorite = true, active = state.favorites[server.Id] == true },
-        title = state.favorites[server.Id] and 'Remove favorite' or 'Add favorite',
-        onclick = function(e) e.StopPropagation(); toggleFavorite(server.Id) end
-      }, {
-        rx:Img({
-          src = state.favorites[server.Id]
-            and '@plugins/ServerBrowser/assets/star-on.png'
-            or '@plugins/ServerBrowser/assets/star-off.png'
+    rx:Div({ class = 'server-main' }, {
+      rx:Div({ class = 'server-heading' }, {
+        rx:Span('', {
+          class = { favorite = true, active = state.favorites[server.Id] == true },
+          title = state.favorites[server.Id] and 'Remove favorite' or 'Add favorite',
+          onclick = function(e) e.StopPropagation(); toggleFavorite(server.Id) end
+        }, {
+          rx:Img({
+            src = state.favorites[server.Id]
+              and '@plugins/ServerBrowser/assets/star-on.png'
+              or '@plugins/ServerBrowser/assets/star-off.png'
+          })
+        }),
+        rx:Div({ class = 'reorder' }, {
+          rx:Span('', {
+            class = 'move-favorite',
+            title = 'Move favorite up',
+            onclick = function(e) e.StopPropagation(); moveFavorite(server.Id, -1) end
+          }, { rx:Img({ src = '@plugins/ServerBrowser/assets/arrow-up.png' }) }),
+          rx:Span('', {
+            class = 'move-favorite',
+            title = 'Move favorite down',
+            onclick = function(e) e.StopPropagation(); moveFavorite(server.Id, 1) end
+          }, { rx:Img({ src = '@plugins/ServerBrowser/assets/arrow-down.png' }) })
+        }),
+        rx:Div({ class = 'title-block' }, {
+          rx:H3(server.Name),
+          rx:Span('(' .. server.Endpoint .. ')', { class = 'endpoint' }),
+          rx:Div({ class = 'server-links' }, {
+            rx:Span('', {
+              class = hasWebsite and 'tag link-badge website-link' or 'tag link-badge hidden',
+              title = hasWebsite and ('Open ' .. server.Name .. ' website') or '',
+              onclick = hasWebsite and function(e)
+                e.StopPropagation()
+                plugin:OpenWebsite(server.WebsiteUrl)
+              end or nil
+            }, { rx:Img({ src = '@plugins/ServerBrowser/assets/web.png' }) }),
+            rx:Span('', {
+              class = hasDiscord and 'tag link-badge discord-icon' or 'tag link-badge hidden',
+              title = hasDiscord and ('Open ' .. server.Name .. ' Discord') or '',
+              onclick = hasDiscord and function(e)
+                e.StopPropagation()
+                plugin:OpenDiscord(server.DiscordUrl)
+              end or nil
+            }, { rx:Img({ src = '@plugins/ServerBrowser/assets/discord.png' }) })
+          })
         })
       }),
-      rx:Div({ class = 'reorder' }, {
-        rx:Span('', {
-          class = 'move-favorite',
-          title = 'Move favorite up',
-          onclick = function(e) e.StopPropagation(); moveFavorite(server.Id, -1) end
-        }, { rx:Img({ src = '@plugins/ServerBrowser/assets/arrow-up.png' }) }),
-        rx:Span('', {
-          class = 'move-favorite',
-          title = 'Move favorite down',
-          onclick = function(e) e.StopPropagation(); moveFavorite(server.Id, 1) end
-        }, { rx:Img({ src = '@plugins/ServerBrowser/assets/arrow-down.png' }) })
+      rx:P(server.Description or '', { class = 'description' })
+    }),
+    rx:Div({ class = 'server-badges' }, {
+      rx:Span(server.Emulator or 'Unknown', { class = 'tag emulator' }),
+      rx:Span(server.Type or 'Unspecified', {
+        class = { tag = true, pve = serverType == 'pve', pvp = serverType == 'pvp' }
       }),
-      rx:Div({ class = 'title-block' }, {
-        rx:H3(server.Name),
-        rx:Span('(' .. server.Endpoint .. ')', { class = 'endpoint' })
-      }),
-      rx:Div({ class = 'stats' }, {
-        rx:Span(server.PlayerCount ~= nil and tostring(server.PlayerCount) or 'N/A', { class = 'count', title = 'Players' }),
-        rx:Span(pingLabel(server), {
-          class = { ping = true, offline = server.HostResolved == false },
-          title = server.HostResolved == false
-            and 'This host name no longer resolves, so the listing looks dead'
-            or 'ICMP latency; N/A means the host does not answer pings'
-        })
+      rx:Span(server.Status or 'Unspecified', {
+        class = {
+          tag = true,
+          statusStable = status == 'stable',
+          statusDevelopment = status == 'development',
+          statusExperimental = status == 'experimental'
+        }
       })
     }),
-    rx:Div({ class = 'server-footer' }, {
-      rx:P(server.Description or '', { class = 'description' }),
-      rx:Div({ class = 'server-badges' }, {
-        rx:Span(server.Emulator or 'Unknown', { class = 'tag emulator' }),
-        rx:Span(server.Type or 'Unspecified', {
-          class = { tag = true, pve = serverType == 'pve', pvp = serverType == 'pvp' }
-        }),
-        rx:Span(server.Status or 'Unspecified', {
-          class = {
-            tag = true,
-            statusStable = status == 'stable',
-            statusDevelopment = status == 'development',
-            statusExperimental = status == 'experimental'
-          }
-        }),
-        rx:Span('Web', {
-          class = hasWebsite and 'tag website-badge website-link' or 'tag website-badge hidden',
-          title = hasWebsite and ('Open ' .. server.Name .. ' website') or '',
-          onclick = hasWebsite and function(e)
-            e.StopPropagation()
-            plugin:OpenWebsite(server.WebsiteUrl)
-          end or nil
-        }),
-        rx:Span('', {
-          class = hasDiscord and 'tag discord-badge discord-icon' or 'tag discord-badge discord-placeholder',
-          title = hasDiscord and ('Open ' .. server.Name .. ' Discord') or 'No Discord link provided',
-          onclick = hasDiscord and function(e)
-            e.StopPropagation()
-            plugin:OpenDiscord(server.DiscordUrl)
-          end or nil
-        }, hasDiscord and { rx:Img({ src = '@plugins/ServerBrowser/assets/discord.png' }) } or {})
+    rx:Div({ class = 'stats-cube' }, {
+      rx:Span(server.PlayerCount ~= nil and tostring(server.PlayerCount) or 'N/A', { class = 'count', title = 'Players' }),
+      rx:Span(pingLabel(server), {
+        class = { ping = true, offline = server.HostResolved == false },
+        title = server.HostResolved == false
+          and 'This host name no longer resolves, so the listing looks dead'
+          or 'ICMP latency; N/A means the host does not answer pings'
       })
     })
   })
