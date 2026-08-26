@@ -43,10 +43,53 @@ public class UiStructureTests {
         var rml = ReadRml();
 
         Assert.Contains("website-link", lua);
-        Assert.Contains("website-placeholder", lua);
         Assert.Contains("plugin:OpenWebsite(server.WebsiteUrl)", lua);
         Assert.Contains(".website-badge", rml);
         Assert.Contains(".website-link:hover", rml);
+    }
+
+    [Fact]
+    public void WebsiteBadgeIsHiddenRatherThanRemovedWhenNoUrlExists() {
+        var lua = ReadLua();
+        var rml = ReadRml();
+
+        Assert.Contains("'tag website-badge hidden'", lua);
+        Assert.DoesNotContain("website-placeholder", lua);
+        Assert.Contains(".hidden { display: none; }", rml);
+    }
+
+    [Fact]
+    public void FavoriteRowsArePinnedAndTintedWithoutReorderingTheVirtualDom() {
+        var lua = ReadLua();
+        var rml = ReadRml();
+
+        Assert.Contains("favoriteServer = state.favorites[server.Id] == true", lua);
+        Assert.Contains(".servers { display: flex; flex-direction: column;", rml);
+        Assert.Contains("order: -1", rml);
+        Assert.Matches(@"\.server\.favoriteServer \{[^}]*background-color", rml);
+    }
+
+    [Fact]
+    public void FavoritesReorderThroughRankedFlexOrderRatherThanRowMoves() {
+        var lua = ReadLua();
+
+        Assert.Contains("local rank = favoriteRank(server.Id)", lua);
+        Assert.Contains("'order: ' .. tostring(rank - 1000) .. ';'", lua);
+        Assert.Contains("for serverId, isFavorite in pairs(result.favorites) do", lua);
+        Assert.Contains("moveFavorite(server.Id, -1)", lua);
+        Assert.Contains("moveFavorite(server.Id, 1)", lua);
+        Assert.Contains("favoriteOrder = favoriteOrder", lua);
+        Assert.DoesNotContain("table.sort(state.servers", lua);
+    }
+
+    [Fact]
+    public void FavoriteRowsCollapseToACompactCard() {
+        var rml = ReadRml();
+
+        Assert.Contains(".server.favoriteServer .server-footer { display: none; }", rml);
+        Assert.Contains(".reorder { display: none; }", rml);
+        Assert.Contains(".server.favoriteServer .reorder { display: flex;", rml);
+        Assert.Matches(@"\.server\.favoriteServer \{[^}]*min-height: 0", rml);
     }
 
     [Fact]

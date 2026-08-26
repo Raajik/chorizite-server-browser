@@ -9,6 +9,7 @@ local function loadSettings()
     clientpath = '',
     endpoint = '',
     favorites = {},
+    favoriteOrder = {},
     alternateClients = {}
   }
   local file = io.open(SETTINGS_FILE, 'r')
@@ -22,11 +23,20 @@ local function loadSettings()
   end
   result.endpoint = result.endpoint or ''
   result.favorites = result.favorites or {}
+  result.favoriteOrder = result.favoriteOrder or {}
   result.alternateClients = result.alternateClients or {}
+  local ranked = {}
+  for _, serverId in ipairs(result.favoriteOrder) do ranked[serverId] = true end
+  for serverId, isFavorite in pairs(result.favorites) do
+    if isFavorite and not ranked[serverId] then
+      result.favoriteOrder[#result.favoriteOrder + 1] = serverId
+    end
+  end
   return result
 end
 
 local saved = loadSettings()
+local favoriteOrder = saved.favoriteOrder
 local state = rx:CreateState({
   servers = {},
   accounts = {},
@@ -57,6 +67,7 @@ local function saveSettings()
     clientpath = state.clientpath,
     endpoint = state.endpoint,
     favorites = state.favorites,
+    favoriteOrder = favoriteOrder,
     alternateClients = state.alternateClients
   }))
   file:close()
@@ -85,8 +96,32 @@ local function loadAccounts()
   bump()
 end
 
+local function favoriteRank(serverId)
+  for index = 1, #favoriteOrder do
+    if favoriteOrder[index] == serverId then return index end
+  end
+  return nil
+end
+
 local function toggleFavorite(serverId)
-  state.favorites[serverId] = not state.favorites[serverId]
+  local isFavorite = not state.favorites[serverId]
+  state.favorites[serverId] = isFavorite
+  local rank = favoriteRank(serverId)
+  if isFavorite then
+    if rank == nil then favoriteOrder[#favoriteOrder + 1] = serverId end
+  elseif rank ~= nil then
+    table.remove(favoriteOrder, rank)
+  end
+  saveSettings()
+  bump()
+end
+
+local function moveFavorite(serverId, delta)
+  local rank = favoriteRank(serverId)
+  if rank == nil then return end
+  local target = rank + delta
+  if target < 1 or target > #favoriteOrder then return end
+  favoriteOrder[rank], favoriteOrder[target] = favoriteOrder[target], favoriteOrder[rank]
   saveSettings()
   bump()
 end
@@ -157,12 +192,15 @@ local function ServerRow(server, isFiltered)
   local status = string.lower(server.Status or '')
   local hasDiscord = #(server.DiscordUrl or '') > 0
   local hasWebsite = #(server.WebsiteUrl or '') > 0
+  local rank = favoriteRank(server.Id)
   return rx:Div({
     class = {
       server = true,
+      favoriteServer = state.favorites[server.Id] == true,
       selected = state.selected ~= nil and state.selected.Id == server.Id,
       filtered = isFiltered
     },
+    style = rank ~= nil and ('order: ' .. tostring(rank - 1000) .. ';') or nil,
     onclick = function() selectServer(server) end
   }, {
     rx:Div({ class = 'server-heading' }, {
@@ -176,6 +214,18 @@ local function ServerRow(server, isFiltered)
             and '@plugins/ServerBrowser/assets/star-on.png'
             or '@plugins/ServerBrowser/assets/star-off.png'
         })
+      }),
+      rx:Div({ class = 'reorder' }, {
+        rx:Span('', {
+          class = 'move-favorite',
+          title = 'Move favorite up',
+          onclick = function(e) e.StopPropagation(); moveFavorite(server.Id, -1) end
+        }, { rx:Img({ src = '@plugins/ServerBrowser/assets/arrow-up.png' }) }),
+        rx:Span('', {
+          class = 'move-favorite',
+          title = 'Move favorite down',
+          onclick = function(e) e.StopPropagation(); moveFavorite(server.Id, 1) end
+        }, { rx:Img({ src = '@plugins/ServerBrowser/assets/arrow-down.png' }) })
       }),
       rx:Div({ class = 'title-block' }, {
         rx:H3(server.Name),
@@ -202,8 +252,8 @@ local function ServerRow(server, isFiltered)
           }
         }),
         rx:Span('Web', {
-          class = hasWebsite and 'tag website-badge website-link' or 'tag website-badge website-placeholder',
-          title = hasWebsite and ('Open ' .. server.Name .. ' website') or 'No website link provided',
+          class = hasWebsite and 'tag website-badge website-link' or 'tag website-badge hidden',
+          title = hasWebsite and ('Open ' .. server.Name .. ' website') or '',
           onclick = hasWebsite and function(e)
             e.StopPropagation()
             plugin:OpenWebsite(server.WebsiteUrl)

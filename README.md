@@ -19,10 +19,11 @@ The last successful responses are cached locally. Player-count failure never blo
 - search across server names and descriptions
 - full-width server cards with inline descriptions
 - server/account tabs for server-first and account-first launching
-- toggleable server favorites
+- toggleable server favorites, pinned to the top of the list as compact cards
+- manual favorite ordering with per-row up/down arrows
 - color-coded PvE/PvP and stability/development status tags
 - clickable Discord invite badge or aligned placeholder on every server card
-- clickable `Web` badge opening the server's website, or a muted placeholder
+- clickable `Web` badge opening the server's website, hidden when none is published
 - generic guidance for sparse community listings
 - per-server alternate client executable overrides
 - multiple saved accounts with current-server and default-server launch actions

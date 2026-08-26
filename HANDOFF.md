@@ -13,7 +13,7 @@ This is a **standalone Chorizite launcher plugin**. It is intentionally separate
 
 ## Current version and status
 
-Current plugin version: **0.4.0**
+Current plugin version: **0.5.0**
 
 Verified on Windows 11 with:
 
@@ -99,6 +99,8 @@ If the network fetch fails, cached community XML is used. Player-count failure i
 - centered title and separate Servers/Accounts tabs
 - ICMP latency shown beside population (`N/A` when the host blocks ping)
 - toggleable star favorites persisted by server ID
+- favorites pinned above the feed as compact single-line cards
+- manual favorite ordering through per-row up/down arrows persisted in `favoriteOrder`
 - color-coded metadata:
   - PvE: light blue
   - PvP: red
@@ -108,7 +110,8 @@ If the network fetch fails, cached community XML is used. Player-count failure i
 - clickable Discord invite badge when a URL exists
 - muted same-width placeholder when Discord is unavailable
 - clickable `Web` badge opening the server website via the shared external-URL path
-- muted placeholder badge when no website URL is published
+- website badge hidden entirely when no distinct website URL exists
+- website values that are really Discord invites fold into the Discord badge
 - multiple saved accounts with aliases and default servers
 - checked-account launch against either the selected server or account defaults
 - compact primary `Launch` action; with no saved accounts it opens the account setup tab
@@ -219,6 +222,10 @@ Current safe approach:
 Regression coverage is in `UiStructureTests.FilteringKeepsEveryServerRowInTheVirtualDom`.
 
 Preserve this stable-child-tree approach for any future filters or sorting UI. If live re-sorting is added, test it carefully—the safest design may be to calculate order only when replacing the entire feed after a network refresh, not on button/key reactions.
+
+Favorite pinning and manual favorite ordering therefore never move rows. `.servers` is a flex column, favorites carry `.favoriteServer { order: -1 }`, and manual ranks are applied as an inline `style="order: <rank - 1000>;"` on the row. Every row keeps its original virtual-DOM position, so no patch ever reorders siblings. If RmlUi were to ignore the inline `order`, the degradation is cosmetic: favorites stay pinned in feed order.
+
+Badges follow the same rule. The website badge toggles the `hidden` class rather than being added or removed, so the badge child list is identical for every server.
 
 ## Build, test, and deploy
 

@@ -52,6 +52,7 @@ public static class ServerFeedParser {
         }
 
         var endpoint = $"{host}:{port}";
+        var (websiteUrl, discordUrl) = ResolveLinks(Value(element, "website_url"), Value(element, "discord_url"));
 
         return new ServerListing {
             Id = OrDefault(Value(element, "id"), endpoint),
@@ -62,9 +63,22 @@ public static class ServerFeedParser {
             Port = port,
             Type = OrDefault(Value(element, "type"), "Unspecified"),
             Status = OrDefault(Value(element, "status"), "Unspecified"),
-            WebsiteUrl = Value(element, "website_url"),
-            DiscordUrl = Value(element, "discord_url")
+            WebsiteUrl = websiteUrl,
+            DiscordUrl = discordUrl
         };
+    }
+
+    private static (string Website, string Discord) ResolveLinks(string website, string discord) {
+        website = website.Trim();
+        discord = discord.Trim();
+
+        if (DiscordLink.IsSupported(website)) {
+            return ("", discord.Length == 0 ? website : discord);
+        }
+
+        return string.Equals(website, discord, StringComparison.OrdinalIgnoreCase)
+            ? ("", discord)
+            : (website, discord);
     }
 
     private static string Value(XElement element, string name) => element.Element(name)?.Value ?? "";

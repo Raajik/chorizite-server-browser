@@ -16,8 +16,15 @@
       .toolbar { display: flex; margin-bottom: 6px; }
       .toolbar input { flex: 1; min-width: 0; }
 
-      .servers { width: 100%; height: 340px; overflow-y: auto; border: 1px; border-color: #80652e; }
-      .server { padding: 7px 9px; min-height: 66px; border-bottom: 1px; border-color: #493b20; }
+      .servers { display: flex; flex-direction: column; width: 100%; height: 340px; overflow-y: auto; border: 1px; border-color: #80652e; }
+      .server { flex: 0 0 auto; padding: 7px 9px; min-height: 66px; border-bottom: 1px; border-color: #493b20; }
+      .server.favoriteServer { order: -1; min-height: 0; padding: 3px 9px; background-color: #16232e; border-left: 3px; border-left-color: #4d7f9c; }
+      .server.favoriteServer .server-footer { display: none; }
+      .reorder { display: none; }
+      .server.favoriteServer .reorder { display: flex; align-items: center; margin-right: 5px; }
+      .move-favorite { width: 13px; height: 13px; padding: 1px; cursor: pointer; }
+      .move-favorite:hover { background-color: #2d4757; }
+      .move-favorite img { width: 11px; height: 11px; }
       .server:hover { background-color: #735b2844; }
       .server.selected { background-color: #735b2877; border-left: 3px; border-left-color: #d6a845; }
       .server.filtered { display: none; }
@@ -42,7 +49,6 @@
       .website-badge { height: 19px; padding: 1px 4px; text-align: center; }
       .website-link { color: #8ec9e8; border-color: #3f6d88; cursor: pointer; }
       .website-link:hover { background-color: #23414f; }
-      .website-placeholder { color: #4d4d4d; border-color: #343434; }
       .discord-badge { width: 23px; height: 19px; margin-right: 0; padding: 1px 3px; text-align: center; }
       .discord-icon { color: white; background-color: #312f48; border-color: #5865f2; cursor: pointer; }
       .discord-icon:hover { background-color: #7289da; }

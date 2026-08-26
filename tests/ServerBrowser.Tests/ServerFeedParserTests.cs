@@ -1,3 +1,4 @@
+using System.Linq;
 using ServerBrowser.Feeds;
 using Xunit;
 
@@ -31,6 +32,38 @@ public class ServerFeedParserTests {
         Assert.Equal("play.coldeve.ac:9000", server.Endpoint);
         Assert.Equal("Stable", server.Status);
         Assert.Equal("https://discord.gg/example", server.DiscordUrl);
+    }
+
+    [Fact]
+    public void DiscordInviteInWebsiteFieldBecomesTheDiscordLinkInsteadOfADuplicateBadge() {
+        const string xml = """
+            <ArrayOfServerItem>
+              <ServerItem><id>1</id><name>Promote</name><server_host>a.test</server_host><server_port>9000</server_port>
+                <website_url>https://discord.gg/promoted</website_url></ServerItem>
+              <ServerItem><id>2</id><name>Drop</name><server_host>b.test</server_host><server_port>9001</server_port>
+                <website_url>https://discord.gg/other</website_url><discord_url>https://discord.gg/kept</discord_url></ServerItem>
+              <ServerItem><id>3</id><name>Exact</name><server_host>c.test</server_host><server_port>9002</server_port>
+                <website_url>https://example.com/play</website_url><discord_url>https://example.com/play</discord_url></ServerItem>
+              <ServerItem><id>4</id><name>Real</name><server_host>d.test</server_host><server_port>9003</server_port>
+                <website_url>https://example.com</website_url><discord_url>https://discord.gg/kept</discord_url></ServerItem>
+            </ArrayOfServerItem>
+            """;
+
+        var servers = ServerFeedParser.ParseServers(xml);
+
+        var promoted = servers.Single(server => server.Name == "Promote");
+        Assert.Equal("", promoted.WebsiteUrl);
+        Assert.Equal("https://discord.gg/promoted", promoted.DiscordUrl);
+
+        var dropped = servers.Single(server => server.Name == "Drop");
+        Assert.Equal("", dropped.WebsiteUrl);
+        Assert.Equal("https://discord.gg/kept", dropped.DiscordUrl);
+
+        Assert.Equal("", servers.Single(server => server.Name == "Exact").WebsiteUrl);
+
+        var real = servers.Single(server => server.Name == "Real");
+        Assert.Equal("https://example.com", real.WebsiteUrl);
+        Assert.Equal("https://discord.gg/kept", real.DiscordUrl);
     }
 
     [Fact]
