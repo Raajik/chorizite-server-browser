@@ -1,0 +1,85 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    # Windows because the tests exercise Windows Credential Manager and ICMP.
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Resolve version
+        id: version
+        shell: pwsh
+        run: |
+          $manifest = Get-Content src/ServerBrowser/manifest.json -Raw | ConvertFrom-Json
+          $version = $manifest.version
+          if ($env:GITHUB_REF -like 'refs/tags/*') {
+            $tagged = '${{ github.ref_name }}' -replace '^v', ''
+            if ($tagged -ne $version) {
+              throw "Tag $tagged does not match manifest version $version. Bump manifest.json or retag."
+            }
+          }
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "tag=v$version" >> $env:GITHUB_OUTPUT
+
+      - name: Test
+        run: dotnet test tests/ServerBrowser.Tests/ServerBrowser.Tests.csproj --configuration Release
+
+      - name: Build
+        run: dotnet build src/ServerBrowser/ServerBrowser.csproj --configuration Release
+
+      - name: Stage plugin
+        shell: pwsh
+        run: |
+          $output = 'src/ServerBrowser/bin/net8.0'
+          $stage = 'stage/ServerBrowser'
+          New-Item -ItemType Directory -Path $stage -Force | Out-Null
+          foreach ($name in 'ServerBrowser.dll','ServerBrowser.pdb','ServerBrowser.deps.json','ServerBrowser.runtimeconfig.json','ServerBrowser.xml','manifest.json') {
+            $path = Join-Path $output $name
+            if (Test-Path $path) { Copy-Item $path $stage }
+          }
+          Copy-Item (Join-Path $output 'assets') $stage -Recurse
+          Get-ChildItem -Recurse $stage | Select-Object -ExpandProperty FullName
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $zip = "ServerBrowser-${{ steps.version.outputs.tag }}.zip"
+          Compress-Archive -Path stage/ServerBrowser -DestinationPath $zip
+          "ZIP=$zip" >> $env:GITHUB_ENV
+
+      - name: Publish release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Native tools signal "not found" through exit codes, so keep stderr non-fatal.
+          $ErrorActionPreference = 'Continue'
+          $tag = '${{ steps.version.outputs.tag }}'
+
+          if (-not (git tag -l $tag)) {
+            git tag $tag
+            git push origin $tag
+            if ($LASTEXITCODE -ne 0) { throw "Could not push tag $tag" }
+          }
+
+          gh release view $tag | Out-Null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag $env:ZIP --clobber
+          } else {
+            gh release create $tag $env:ZIP --title $tag --generate-notes
+          }
+          if ($LASTEXITCODE -ne 0) { throw "Release step failed for $tag" }

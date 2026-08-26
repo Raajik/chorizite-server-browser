@@ -1,45 +1,29 @@
 # Chorizite Community Server Browser
 
-A launcher-only Chorizite plugin by [Raajik](https://github.com/Raajik) that browses the AC community server list and launches the selected server without manually looking up host names or ports.
+A launcher-only Chorizite plugin by [Raajik](https://github.com/Raajik) that browses the AC community server list and launches straight into the server you pick, instead of typing host names and ports.
 
-Development status, architecture, known constraints, and continuation notes are documented in [HANDOFF.md](HANDOFF.md).
+## Install
 
-## Data sources
+Download the latest zip from [Releases](https://github.com/Raajik/chorizite-server-browser/releases) and extract it into your Chorizite `plugins` folder, so the files land in `plugins/ServerBrowser`.
 
-- Community servers: `https://raw.githubusercontent.com/acresources/serverslist/master/Servers.xml`
-- Optional player counts: `http://treestats.net/player_counts-latest.json`
-
-The last successful responses are cached locally. Player-count failure never blocks server browsing.
+Requires Chorizite 0.0.15 and its official indexed plugins. Chorizite 0.0.18 is binary-incompatible with those UI plugins.
 
 ## Features
 
-- server name, description, emulator, PvE/PvP type, status, website, and Discord
-- TreeStats player counts when available
-- bounded ICMP latency probes with `N/A` for hosts that block ping
-- search across server names and descriptions
-- full-width server cards with inline descriptions
-- server/account tabs for server-first and account-first launching
-- ICMP latency per server, with `Offline` marking listings whose host no longer resolves
-- toggleable server favorites, pinned to the top of the list as compact cards
-- manual favorite ordering with per-row up/down arrows
-- color-coded PvE/PvP and stability/development status tags
-- website and Discord icon buttons in a centred column, hidden when no link exists
-- emulator, type, and status stacked in a badge column beside a population/ping cube
-- generic guidance for sparse community listings
-- per-server alternate client executable overrides
-- multiple saved accounts with current-server and default-server launch actions
-- passwords stored in Windows Credential Manager, never in settings or account metadata
-- optional AES-GCM encrypted account backup protected by a user passphrase
-- direct launch through Chorizite
+- browsable community list with search, player counts, and latency
+- favorites pinned to the top as compact cards, reorderable by hand
+- colour-coded emulator, PvE/PvP, and status badges with website and Discord links
+- multiple saved accounts with per-server default client overrides
+- passwords stored in Windows Credential Manager, never in plugin files
+- optional AES-GCM encrypted account backup protected by a passphrase
 
-## Requirements
+Servers are read from the [community list](https://github.com/acresources/serverslist), with optional player counts from [TreeStats](http://treestats.net). Both are cached, and a counts failure never blocks browsing.
 
-Use Chorizite 0.0.15 with its official indexed plugins. Chorizite 0.0.18 is currently binary-incompatible with those UI plugins.
-
-## Build, test, and deploy
+## Build
 
 ```bash
-./scripts/deploy.sh
+./scripts/deploy.sh              # test, build, and install locally
+CHORIZITE_HOME=D:/Games/Chorizite ./scripts/deploy.sh
 ```
 
-Override the install location with `CHORIZITE_HOME` when needed.
+Architecture, platform constraints, and continuation notes live in [HANDOFF.md](HANDOFF.md).
