@@ -13,7 +13,7 @@ This is a **standalone Chorizite launcher plugin**. It is intentionally separate
 
 ## Current version and status
 
-Current plugin version: **0.5.0**
+Current plugin version: **0.5.1**
 
 Verified on Windows 11 with:
 
@@ -201,6 +201,27 @@ If the Windows profile is lost, Credential Manager entries are not independently
 - `scripts/make_discord_icon.py`
   - reproducibly generates the bundled icon
 
+## Critical settings-persistence invariant
+
+**Never pass an `rx` state table to `json.encode`.**
+
+`rx:CreateState` moves every value into a C#-backed observable and empties the raw Lua table, leaving only metatable accessors. The bundled `json.lua` first checks `rawget(val, 1) ~= nil or next(val) == nil`; both are false-y for a proxy, so it classifies any state table as an *array*, then iterates it through `__pairs`, hits the string keys, and throws:
+
+```text
+json:73: invalid table: mixed or invalid key types
+```
+
+Because `saveSettings` had already opened the file with `w`, the throw left `settings.json` truncated to zero bytes, which then broke the next load with `json:185: unexpected character ''`. That combination silently destroyed saved settings whenever a favorite was toggled.
+
+The rules now enforced in `server-browser.lua`:
+
+1. Persist plain Lua tables only — `plainCopy()` deep-copies one level out of any proxy.
+2. Favorites persist as the `favoriteOrder` array of server IDs; the `state.favorites` map is rebuilt from it at load.
+3. `json.encode` runs inside `pcall` **before** the file is opened, so a failure can never truncate the file.
+4. `json.decode` runs inside `pcall`, so an empty or corrupt file falls back to defaults.
+
+Regression coverage: `UiStructureTests.SettingsPersistPlainTablesRatherThanReactiveProxies`.
+
 ## Critical RmlUi invariant
 
 **Do not implement filtering by adding/removing server rows from the virtual DOM.**
@@ -223,7 +244,17 @@ Regression coverage is in `UiStructureTests.FilteringKeepsEveryServerRowInTheVir
 
 Preserve this stable-child-tree approach for any future filters or sorting UI. If live re-sorting is added, test it carefully—the safest design may be to calculate order only when replacing the entire feed after a network refresh, not on button/key reactions.
 
-Favorite pinning and manual favorite ordering therefore never move rows. `.servers` is a flex column, favorites carry `.favoriteServer { order: -1 }`, and manual ranks are applied as an inline `style="order: <rank - 1000>;"` on the row. Every row keeps its original virtual-DOM position, so no patch ever reorders siblings. If RmlUi were to ignore the inline `order`, the degradation is cosmetic: favorites stay pinned in feed order.
+Favorite pinning and manual ordering are done in Lua by `pinnedFirst()`, which emits favorites in rank order ahead of everything else. This is a permutation only: every server still yields exactly one row, so the child count never changes and no row is ever added or removed. That is the same class of update as replacing the feed after a network refresh, which is known to be safe.
+
+### RmlUi does not support the CSS `order` property
+
+An earlier 0.5.0 attempt pinned favorites with flexbox `order` to avoid moving rows. RmlUi rejects it outright:
+
+```text
+[RmlUi] Syntax error parsing property declaration 'order: -1;'
+```
+
+Do not reintroduce `order`, and be skeptical of other modern flexbox properties. `display: flex`, `flex`, `align-items`, and `justify-content` are supported and used throughout.
 
 Badges follow the same rule. The website badge toggles the `hidden` class rather than being added or removed, so the badge child list is identical for every server.
 

@@ -14,9 +14,10 @@ local function loadSettings()
   }
   local file = io.open(SETTINGS_FILE, 'r')
   if file ~= nil then
-    local decoded = json.decode(file:read('a'))
+    local contents = file:read('a')
     file:close()
-    if decoded ~= nil then result = decoded end
+    local ok, decoded = pcall(json.decode, contents)
+    if ok and type(decoded) == 'table' then result = decoded end
   end
   if result.clientpath == nil or #result.clientpath == 0 then
     result.clientpath = plugin:GetDefaultClientPath()
@@ -28,7 +29,7 @@ local function loadSettings()
   local ranked = {}
   for _, serverId in ipairs(result.favoriteOrder) do ranked[serverId] = true end
   for serverId, isFavorite in pairs(result.favorites) do
-    if isFavorite and not ranked[serverId] then
+    if type(serverId) == 'string' and isFavorite == true and not ranked[serverId] then
       result.favoriteOrder[#result.favoriteOrder + 1] = serverId
     end
   end
@@ -37,6 +38,25 @@ end
 
 local saved = loadSettings()
 local favoriteOrder = saved.favoriteOrder
+local savedFavorites = {}
+for _, serverId in ipairs(favoriteOrder) do savedFavorites[serverId] = true end
+
+-- rx state tables are C#-backed proxies whose raw contents are empty, so json.encode
+-- misreads them as arrays and throws on their string keys. Persist plain copies only.
+local function plainCopy(source)
+  local copy = {}
+  for key, value in pairs(source) do
+    if type(value) == 'table' then
+      local inner = {}
+      for innerKey, innerValue in pairs(value) do inner[innerKey] = innerValue end
+      copy[key] = inner
+    else
+      copy[key] = value
+    end
+  end
+  return copy
+end
+
 local state = rx:CreateState({
   servers = {},
   accounts = {},
@@ -47,7 +67,7 @@ local state = rx:CreateState({
   error = '',
   clientpath = saved.clientpath,
   endpoint = saved.endpoint,
-  favorites = saved.favorites,
+  favorites = savedFavorites,
   alternateClients = saved.alternateClients,
   selectedAccounts = {},
   accountId = '',
@@ -61,15 +81,19 @@ local state = rx:CreateState({
 })
 
 local function saveSettings()
-  local file = io.open(SETTINGS_FILE, 'w')
-  if file == nil then return end
-  file:write(json.encode({
+  local ok, encoded = pcall(json.encode, {
     clientpath = state.clientpath,
     endpoint = state.endpoint,
-    favorites = state.favorites,
     favoriteOrder = favoriteOrder,
-    alternateClients = state.alternateClients
-  }))
+    alternateClients = plainCopy(state.alternateClients)
+  })
+  if not ok then
+    state.error = 'Could not save settings: ' .. tostring(encoded)
+    return
+  end
+  local file = io.open(SETTINGS_FILE, 'w')
+  if file == nil then return end
+  file:write(encoded)
   file:close()
 end
 
@@ -187,12 +211,31 @@ local refresh = async(function()
   state.revision = state.revision + 1
 end)
 
+-- RmlUi rejects the CSS `order` property, so favorites are ordered here instead.
+-- Every server still yields exactly one row; only their sequence changes.
+local function pinnedFirst()
+  local pinned = {}
+  local rest = {}
+  for _, server in ipairs(state.servers) do
+    local rank = favoriteRank(server.Id)
+    if rank ~= nil then
+      pinned[#pinned + 1] = { rank = rank, server = server }
+    else
+      rest[#rest + 1] = server
+    end
+  end
+  table.sort(pinned, function(left, right) return left.rank < right.rank end)
+  local ordered = {}
+  for _, entry in ipairs(pinned) do ordered[#ordered + 1] = entry.server end
+  for _, server in ipairs(rest) do ordered[#ordered + 1] = server end
+  return ordered
+end
+
 local function ServerRow(server, isFiltered)
   local serverType = string.lower(server.Type or '')
   local status = string.lower(server.Status or '')
   local hasDiscord = #(server.DiscordUrl or '') > 0
   local hasWebsite = #(server.WebsiteUrl or '') > 0
-  local rank = favoriteRank(server.Id)
   return rx:Div({
     class = {
       server = true,
@@ -200,7 +243,6 @@ local function ServerRow(server, isFiltered)
       selected = state.selected ~= nil and state.selected.Id == server.Id,
       filtered = isFiltered
     },
-    style = rank ~= nil and ('order: ' .. tostring(rank - 1000) .. ';') or nil,
     onclick = function() selectServer(server) end
   }, {
     rx:Div({ class = 'server-heading' }, {
@@ -415,7 +457,7 @@ local function ServersView()
       local rows = {}
       -- Keep the virtual-DOM child tree stable. RmlUi 0.0.11 can crash in
       -- SetInnerRml when a filter adds/removes dozens of sibling nodes.
-      for _, server in ipairs(state.servers) do
+      for _, server in ipairs(pinnedFirst()) do
         rows[#rows + 1] = ServerRow(server, not matches(server))
       end
       return rows

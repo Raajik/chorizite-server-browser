@@ -64,22 +64,40 @@ public class UiStructureTests {
         var rml = ReadRml();
 
         Assert.Contains("favoriteServer = state.favorites[server.Id] == true", lua);
-        Assert.Contains(".servers { display: flex; flex-direction: column;", rml);
-        Assert.Contains("order: -1", rml);
         Assert.Matches(@"\.server\.favoriteServer \{[^}]*background-color", rml);
+    }
+
+    [Fact]
+    public void OrderingNeverUsesTheUnsupportedCssOrderProperty() {
+        var lua = ReadLua();
+        var rml = ReadRml();
+
+        Assert.DoesNotMatch(@"(?<![-\w])order:", rml);
+        Assert.DoesNotMatch(@"(?<![-\w])order:", lua);
     }
 
     [Fact]
     public void FavoritesReorderThroughRankedFlexOrderRatherThanRowMoves() {
         var lua = ReadLua();
 
-        Assert.Contains("local rank = favoriteRank(server.Id)", lua);
-        Assert.Contains("'order: ' .. tostring(rank - 1000) .. ';'", lua);
+        Assert.Contains("local function pinnedFirst()", lua);
+        Assert.Contains("for _, server in ipairs(pinnedFirst()) do", lua);
         Assert.Contains("for serverId, isFavorite in pairs(result.favorites) do", lua);
         Assert.Contains("moveFavorite(server.Id, -1)", lua);
         Assert.Contains("moveFavorite(server.Id, 1)", lua);
         Assert.Contains("favoriteOrder = favoriteOrder", lua);
         Assert.DoesNotContain("table.sort(state.servers", lua);
+    }
+
+    [Fact]
+    public void SettingsPersistPlainTablesRatherThanReactiveProxies() {
+        var lua = ReadLua();
+
+        Assert.Contains("plainCopy(state.alternateClients)", lua);
+        Assert.Contains("pcall(json.encode", lua);
+        Assert.Contains("pcall(json.decode, contents)", lua);
+        Assert.DoesNotContain("favorites = state.favorites,", lua);
+        Assert.DoesNotContain("alternateClients = state.alternateClients\n", lua);
     }
 
     [Fact]
