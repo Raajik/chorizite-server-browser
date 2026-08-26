@@ -15,6 +15,24 @@ public sealed class WindowsCredentialStore : ISecretStore {
         _targetPrefix = targetPrefix;
     }
 
+    /// <summary>
+    /// Probes the credential API with a harmless read. Wine exports these functions, so this
+    /// stays true under Proton; it only turns false on hosts that lack them entirely.
+    /// </summary>
+    public static bool IsAvailable() {
+        if (!OperatingSystem.IsWindows()) return false;
+
+        try {
+            if (CredRead($"ServerBrowser.Probe/{Guid.NewGuid():N}", CredentialTypeGeneric, 0, out var pointer)) {
+                CredFree(pointer);
+            }
+            return true;
+        }
+        catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException or BadImageFormatException) {
+            return false;
+        }
+    }
+
     public void Write(string accountId, string password) {
         var bytes = Encoding.Unicode.GetBytes(password);
         var blob = Marshal.AllocHGlobal(bytes.Length);

@@ -28,7 +28,7 @@ public class AccountManagerTests : IDisposable {
         Assert.DoesNotContain("correct horse battery staple", File.ReadAllText(Path.Combine(_directory, "accounts.json")));
     }
 
-    [Fact]
+    [WindowsOnlyFact]
     public void WindowsCredentialStoreRoundTripsSecret() {
         var accountId = $"test-{Guid.NewGuid():N}";
         var store = new WindowsCredentialStore("Raajik.Chorizite.ServerBrowser.Tests");

@@ -13,7 +13,7 @@ This is a **standalone Chorizite launcher plugin**. It is intentionally separate
 
 ## Current version and status
 
-Current plugin version: **0.7.2**
+Current plugin version: **0.7.3**
 
 Verified on Windows 11 with:
 
@@ -181,6 +181,16 @@ Using endpoint as a fallback ID is important: blank/duplicate IDs can cause ambi
   - AES-256-GCM authenticated encryption
   - PBKDF2-SHA256 with 600,000 iterations and a random salt
   - explicit export/import; backup passphrases are never saved
+
+### Platform reality
+
+Chorizite runs only on Windows: every bundled plugin ships `win-x86`/`win-x64` natives and nothing else, and the framework injects into the Windows AC client. A native Linux host therefore cannot load this plugin at all, which is why CI publishes from `windows-latest`.
+
+The realistic non-Windows case is Wine/Proton, where the process *is* Windows. Wine's `advapi32.spec` exports `CredReadW`, `CredWriteW`, `CredDeleteW`, and `CredFree` as real functions rather than stubs, so the credential store works there.
+
+For hosts that lack those exports anyway, `WindowsCredentialStore.IsAvailable()` probes once with a harmless read and the plugin falls back to `UnavailableSecretStore`. Browsing, favorites, ping, and anonymous launching keep working; only password operations raise a readable `PlatformNotSupportedException`, and account deletion still succeeds. Do not add a Linux keyring backend without a Linux host that can actually load the plugin.
+
+The test suite runs on Linux as well (`.github/workflows/ci.yml`) so nothing hard-binds to a Windows API outside the secret store. The one test that needs Credential Manager carries `[WindowsOnlyFact]` and skips elsewhere.
 
 If the Windows profile is lost, Credential Manager entries are not independently recoverable. The encrypted export is the recovery mechanism, and losing its passphrase makes that backup unrecoverable by design.
 

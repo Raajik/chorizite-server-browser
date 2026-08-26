@@ -33,9 +33,16 @@ public sealed class ServerBrowserPlugin : IPluginCore {
 
     protected override void Initialize() {
         Directory.CreateDirectory(DataDirectory);
-        _accounts = new AccountManager(
-            DataDirectory,
-            new WindowsCredentialStore("Raajik.Chorizite.ServerBrowser"));
+        ISecretStore secrets;
+        if (WindowsCredentialStore.IsAvailable()) {
+            secrets = new WindowsCredentialStore("Raajik.Chorizite.ServerBrowser");
+        }
+        else {
+            secrets = new UnavailableSecretStore();
+            _log.LogWarning("{Reason} Browsing and launching without saved accounts still work.", UnavailableSecretStore.Reason);
+        }
+
+        _accounts = new AccountManager(DataDirectory, secrets);
         _feedClient = new ServerFeedClient(Path.Combine(DataDirectory, "cache"));
         _panel = _rmlUi.CreatePanel("Server Browser", Path.Combine(AssemblyDirectory, "assets", "server-browser.rml"));
         if (_panel is null) {
