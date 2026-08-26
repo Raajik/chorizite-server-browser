@@ -1,0 +1,36 @@
+<rml>
+  <head>
+    <title>Community Server Browser</title>
+    <script src="server-browser.lua"></script>
+    <style>
+      * { box-sizing: border-box; }
+      body { width: 820px; font-family: Tahoma; color: #eee; }
+      .inner { background-color: #080808f4; padding: 8px; }
+      h2 { color: #d6a845; margin: 2px 0 8px 0; }
+      .toolbar, .login { display: flex; margin-bottom: 7px; }
+      .toolbar input { flex: 4; }
+      .toolbar button { margin-left: 6px; }
+      .content { display: flex; height: 390px; }
+      .servers { width: 430px; overflow-y: auto; border: 1px; border-color: #80652e; }
+      .server { padding: 5px; border-bottom: 1px; border-color: #493b20; }
+      .server:hover, .selected { background-color: #735b2866; }
+      .server h3 { color: #efd07d; font-size: 16px; margin: 0; }
+      .server .meta { color: #bdb6a4; font-size: 12px; }
+      .count { float: right; color: #7fdb88; }
+      .details { flex: 1; padding: 8px 10px; overflow-y: auto; }
+      .details h3 { color: #efd07d; margin: 0 0 5px 0; }
+      .description { color: #ddd2bd; }
+      .endpoint { color: #8ec9e8; }
+      .login { border-top: 1px; border-color: #80652e; padding-top: 8px; }
+      .field { flex: 1; margin-right: 7px; }
+      .field label { display: block; color: #d6a845; font-size: 12px; }
+      .field input { width: 100%; }
+      .launch { width: 110px; font-weight: bold; }
+      .error { color: #ff8787; }
+      .loading { color: #d6a845; padding: 12px; }
+    </style>
+  </head>
+  <body class="window">
+    <div class="inner" id="server-browser" />
+  </body>
+</rml>
