@@ -1,12 +1,27 @@
 from PIL import Image, ImageDraw
 
-size = 32
-image = Image.new("RGBA", (size, size), (35, 65, 79, 255))
-draw = ImageDraw.Draw(image)
-line = (142, 201, 232, 255)
-# Globe mark sized for the same 14px slot the Discord icon uses.
-draw.ellipse((6, 6, 26, 26), outline=line, width=3)
-draw.ellipse((12, 6, 20, 26), outline=line, width=2)
-draw.line((7, 13, 25, 13), fill=line, width=2)
-draw.line((7, 19, 25, 19), fill=line, width=2)
-image.save("src/ServerBrowser/assets/web.png")
+# Matches the Discord mark: supersampled, transparent, badge CSS supplies the fill.
+SCALE = 8
+SIZE = 28
+BIG = SIZE * SCALE
+STROKE = int(7 * BIG / 112)
+
+
+def s(*values):
+    return tuple(int(value * BIG / 112) for value in values)
+
+
+mask = Image.new("L", (BIG, BIG), 0)
+draw = ImageDraw.Draw(mask)
+
+# Globe: outer circle, one meridian ellipse, two latitude lines.
+draw.ellipse(s(12, 12, 100, 100), outline=255, width=STROKE)
+draw.ellipse(s(42, 12, 70, 100), outline=255, width=STROKE)
+draw.line([s(17, 42), s(95, 42)], fill=255, width=STROKE)
+draw.line([s(17, 70), s(95, 70)], fill=255, width=STROKE)
+
+icon = Image.new("RGBA", (BIG, BIG), (198, 226, 242, 255))
+icon.putalpha(mask)
+icon.resize((SIZE, SIZE), Image.Resampling.LANCZOS).save(
+    "src/ServerBrowser/assets/web.png"
+)

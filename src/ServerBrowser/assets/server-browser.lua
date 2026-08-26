@@ -278,28 +278,28 @@ local function ServerRow(server, isFiltered)
         }),
         rx:Div({ class = 'title-block' }, {
           rx:H3(server.Name),
-          rx:Span('(' .. server.Endpoint .. ')', { class = 'endpoint' }),
-          rx:Div({ class = 'server-links' }, {
-            rx:Span('', {
-              class = hasWebsite and 'tag link-badge website-link' or 'tag link-badge hidden',
-              title = hasWebsite and ('Open ' .. server.Name .. ' website') or '',
-              onclick = hasWebsite and function(e)
-                e.StopPropagation()
-                plugin:OpenWebsite(server.WebsiteUrl)
-              end or nil
-            }, { rx:Img({ src = '@plugins/ServerBrowser/assets/web.png' }) }),
-            rx:Span('', {
-              class = hasDiscord and 'tag link-badge discord-icon' or 'tag link-badge hidden',
-              title = hasDiscord and ('Open ' .. server.Name .. ' Discord') or '',
-              onclick = hasDiscord and function(e)
-                e.StopPropagation()
-                plugin:OpenDiscord(server.DiscordUrl)
-              end or nil
-            }, { rx:Img({ src = '@plugins/ServerBrowser/assets/discord.png' }) })
-          })
+          rx:Span('(' .. server.Endpoint .. ')', { class = 'endpoint' })
         })
       }),
       rx:P(server.Description or '', { class = 'description' })
+    }),
+    rx:Div({ class = 'server-links' }, {
+      rx:Span('', {
+        class = hasWebsite and 'tag link-badge website-link' or 'tag link-badge hidden',
+        title = hasWebsite and ('Open ' .. server.Name .. ' website') or '',
+        onclick = hasWebsite and function(e)
+          e.StopPropagation()
+          plugin:OpenWebsite(server.WebsiteUrl)
+        end or nil
+      }, { rx:Img({ src = '@plugins/ServerBrowser/assets/web.png' }) }),
+      rx:Span('', {
+        class = hasDiscord and 'tag link-badge discord-icon' or 'tag link-badge hidden',
+        title = hasDiscord and ('Open ' .. server.Name .. ' Discord') or '',
+        onclick = hasDiscord and function(e)
+          e.StopPropagation()
+          plugin:OpenDiscord(server.DiscordUrl)
+        end or nil
+      }, { rx:Img({ src = '@plugins/ServerBrowser/assets/discord.png' }) })
     }),
     rx:Div({ class = 'server-badges' }, {
       rx:Span(server.Emulator or 'Unknown', { class = 'tag emulator' }),

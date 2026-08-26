@@ -202,11 +202,18 @@ public class UiStructureTests {
     }
 
     [Fact]
-    public void WebAndDiscordRenderAsMatchingIconsOnTheTitleLine() {
+    public void WebAndDiscordRenderAsMatchingIconsBesideTheBadgeColumn() {
         var lua = ReadLua();
         var rml = ReadRml();
 
         Assert.Contains("class = 'server-links'", lua);
+        Assert.Contains(".server-links { display: flex; flex-direction: column; justify-content: center;", rml);
+
+        Assert.True(lua.IndexOf("class = 'server-links'", StringComparison.Ordinal) >
+                    lua.IndexOf("class = 'description'", StringComparison.Ordinal),
+            "links belong outside the text column, between it and the badges");
+        Assert.True(lua.IndexOf("class = 'server-badges'", StringComparison.Ordinal) >
+                    lua.IndexOf("class = 'server-links'", StringComparison.Ordinal));
         Assert.Contains("assets/web.png", lua);
         Assert.Contains("assets/discord.png", lua);
         Assert.Contains("'tag link-badge website-link'", lua);

@@ -13,7 +13,7 @@ This is a **standalone Chorizite launcher plugin**. It is intentionally separate
 
 ## Current version and status
 
-Current plugin version: **0.7.0**
+Current plugin version: **0.7.1**
 
 Verified on Windows 11 with:
 
@@ -95,7 +95,7 @@ If the network fetch fails, cached community XML is used. Player-count failure i
 - server cards showing emulator, PvE/PvP type, status, and player count
 - three-region server cards: flexible text column, vertical badge column, stats cube
 - endpoint shown in parentheses directly beside each server title
-- website and Discord icon buttons sharing the title line with the server name
+- website and Discord icon buttons in a centred column just left of the badges
 - emulator/type/status stacked vertically in a 72px column at 10px type
 - population and ping in a bordered 66px cube, ping in its own band beneath a divider
 - centered title and separate Servers/Accounts tabs
