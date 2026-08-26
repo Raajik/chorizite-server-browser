@@ -2,15 +2,15 @@ using System;
 
 namespace ServerBrowser;
 
-public static class DiscordLink {
+public static class WebsiteLink {
     public static bool IsSupported(string? url) =>
         Uri.TryCreate(url, UriKind.Absolute, out var uri)
-        && uri.Scheme == Uri.UriSchemeHttps
-        && string.Equals(uri.Host, "discord.gg", StringComparison.OrdinalIgnoreCase);
+        && (uri.Scheme == Uri.UriSchemeHttps || uri.Scheme == Uri.UriSchemeHttp)
+        && !string.IsNullOrEmpty(uri.Host);
 
     public static bool TryOpen(string? url, out string? error) {
         if (!IsSupported(url)) {
-            error = "Only https://discord.gg invite links can be opened";
+            error = "Only http and https website links can be opened";
             return false;
         }
 

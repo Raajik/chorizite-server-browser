@@ -86,6 +86,12 @@ public sealed class ServerBrowserPlugin : IPluginCore {
         }
     }
 
+    public void OpenWebsite(string url) {
+        if (!WebsiteLink.TryOpen(url, out var error)) {
+            _log.LogWarning("Unable to open website link {WebsiteUrl}: {Error}", url, error);
+        }
+    }
+
     public void Launch(string clientPath, string endpoint, string username, string password) {
         if (string.IsNullOrWhiteSpace(endpoint)) throw new ArgumentException("Select a server first", nameof(endpoint));
         _launcher.LaunchClient(clientPath, endpoint, username, password);

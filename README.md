@@ -22,6 +22,7 @@ The last successful responses are cached locally. Player-count failure never blo
 - toggleable server favorites
 - color-coded PvE/PvP and stability/development status tags
 - clickable Discord invite badge or aligned placeholder on every server card
+- clickable `Web` badge opening the server's website, or a muted placeholder
 - generic guidance for sparse community listings
 - per-server alternate client executable overrides
 - multiple saved accounts with current-server and default-server launch actions

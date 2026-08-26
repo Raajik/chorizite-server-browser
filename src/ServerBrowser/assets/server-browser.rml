@@ -39,6 +39,10 @@
       .stats span { display: block; }
       .count { color: #7fdb88; font-size: 16px; line-height: 17px; }
       .ping { color: #8ec9e8; }
+      .website-badge { height: 19px; padding: 1px 4px; text-align: center; }
+      .website-link { color: #8ec9e8; border-color: #3f6d88; cursor: pointer; }
+      .website-link:hover { background-color: #23414f; }
+      .website-placeholder { color: #4d4d4d; border-color: #343434; }
       .discord-badge { width: 23px; height: 19px; margin-right: 0; padding: 1px 3px; text-align: center; }
       .discord-icon { color: white; background-color: #312f48; border-color: #5865f2; cursor: pointer; }
       .discord-icon:hover { background-color: #7289da; }

@@ -156,6 +156,7 @@ local function ServerRow(server, isFiltered)
   local serverType = string.lower(server.Type or '')
   local status = string.lower(server.Status or '')
   local hasDiscord = #(server.DiscordUrl or '') > 0
+  local hasWebsite = #(server.WebsiteUrl or '') > 0
   return rx:Div({
     class = {
       server = true,
@@ -199,6 +200,14 @@ local function ServerRow(server, isFiltered)
             statusDevelopment = status == 'development',
             statusExperimental = status == 'experimental'
           }
+        }),
+        rx:Span('Web', {
+          class = hasWebsite and 'tag website-badge website-link' or 'tag website-badge website-placeholder',
+          title = hasWebsite and ('Open ' .. server.Name .. ' website') or 'No website link provided',
+          onclick = hasWebsite and function(e)
+            e.StopPropagation()
+            plugin:OpenWebsite(server.WebsiteUrl)
+          end or nil
         }),
         rx:Span('', {
           class = hasDiscord and 'tag discord-badge discord-icon' or 'tag discord-badge discord-placeholder',

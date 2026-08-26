@@ -38,6 +38,18 @@ public class UiStructureTests {
     }
 
     [Fact]
+    public void ServerRowsRenderWebsiteSlots() {
+        var lua = ReadLua();
+        var rml = ReadRml();
+
+        Assert.Contains("website-link", lua);
+        Assert.Contains("website-placeholder", lua);
+        Assert.Contains("plugin:OpenWebsite(server.WebsiteUrl)", lua);
+        Assert.Contains(".website-badge", rml);
+        Assert.Contains(".website-link:hover", rml);
+    }
+
+    [Fact]
     public void LayoutUsesServerAndAccountTabsWithFullWidthDescribedRows() {
         var lua = ReadLua();
         var rml = ReadRml();

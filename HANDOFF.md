@@ -13,7 +13,7 @@ This is a **standalone Chorizite launcher plugin**. It is intentionally separate
 
 ## Current version and status
 
-Current plugin version: **0.3.0**
+Current plugin version: **0.4.0**
 
 Verified on Windows 11 with:
 
@@ -107,6 +107,8 @@ If the network fetch fails, cached community XML is used. Player-count failure i
   - Experimental: orange
 - clickable Discord invite badge when a URL exists
 - muted same-width placeholder when Discord is unavailable
+- clickable `Web` badge opening the server website via the shared external-URL path
+- muted placeholder badge when no website URL is published
 - multiple saved accounts with aliases and default servers
 - checked-account launch against either the selected server or account defaults
 - compact primary `Launch` action; with no saved accounts it opens the account setup tab
@@ -153,6 +155,10 @@ Using endpoint as a fallback ID is important: blank/duplicate IDs can cause ambi
 
 - `src/ServerBrowser/Feeds/ServerListing.cs`
 - `src/ServerBrowser/Feeds/PlayerCount.cs`
+- `src/ServerBrowser/DiscordLink.cs`, `WebsiteLink.cs`, `ExternalLink.cs`
+  - scheme/host validation before any shell execute
+  - `ExternalLink` is the single `Process.Start` path
+
 - `src/ServerBrowser/Feeds/ServerPingProbe.cs`
   - bounded concurrent ICMP probes
   - unavailable results remain nullable and render as `N/A`
@@ -268,6 +274,11 @@ dotnet build src/ServerBrowser/ServerBrowser.csproj
 - Windows Credential Manager round trip and cleanup
 - password-protected encrypted backup round trip
 
+`tests/ServerBrowser.Tests/WebsiteLinkTests.cs`
+
+- http/https website acceptance
+- rejection of relative, `file:`, `javascript:`, and custom-scheme URLs
+
 `tests/ServerBrowser.Tests/ServerPingProbeTests.cs`
 
 - reachable-host ICMP latency
@@ -290,7 +301,6 @@ The unrelated `TestPlugin` texture warning comes from Chorizite's plugin index/U
 
 ## Known limitations
 
-- Website values are displayed as text; they are not yet external-link buttons.
 - Discord badges open only validated `https://discord.gg/...` links through the Windows default URL handler. The badge click stops propagation so it does not change the selected server.
 - Ping uses ICMP rather than the AC game port (the game endpoint is not a TCP listener). Servers that block ICMP correctly show `N/A`.
 - Account backup/export currently uses a typed path rather than a native file-picker dialog.
@@ -303,13 +313,12 @@ The unrelated `TestPlugin` texture warning comes from Chorizite's plugin index/U
 
 Priority order:
 
-1. Add a validated website link action using the same external-URL pattern as Discord.
-2. Add tested TreeStats alias mapping for known name mismatches.
-3. Add a native file-picker bridge for encrypted account backup import/export.
-4. Consider favorite-first ordering only if it can preserve the RmlUi virtual-DOM child tree safely.
-5. Add recent servers without storing additional credentials.
-6. Consider replacing Chorizite's original simple login screen entirely, rather than showing Server Browser as a separate panel, only if this can be done without coupling to private Launcher plugin internals.
-7. Package/publish the plugin in Raajik's GitHub repository and optionally submit it to Chorizite's plugin index.
+1. Add tested TreeStats alias mapping for known name mismatches.
+2. Add a native file-picker bridge for encrypted account backup import/export.
+3. Consider favorite-first ordering only if it can preserve the RmlUi virtual-DOM child tree safely.
+4. Add recent servers without storing additional credentials.
+5. Consider replacing Chorizite's original simple login screen entirely, rather than showing Server Browser as a separate panel, only if this can be done without coupling to private Launcher plugin internals.
+6. Package/publish the plugin in Raajik's GitHub repository and optionally submit it to Chorizite's plugin index.
 
 ## Repository state at handoff
 
