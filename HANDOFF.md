@@ -13,7 +13,7 @@ This is a **standalone Chorizite launcher plugin**. It is intentionally separate
 
 ## Current version and status
 
-Current plugin version: **0.7.1**
+Current plugin version: **0.7.2**
 
 Verified on Windows 11 with:
 
@@ -203,6 +203,9 @@ If the Windows profile is lost, Credential Manager entries are not independently
 
 - `scripts/make_discord_icon.py`, `make_web_icon.py`, `make_star_icons.py`, `make_arrow_icons.py`
   - reproducibly generate the bundled icons (requires Pillow)
+  - `make_discord_icon.py` additionally needs `svglib reportlab rlPyCairo pycairo`, because it rasterises Discord's official Clyde path rather than approximating it
+
+Hand-drawn approximations of the Discord mark were tried first and consistently read as a ghost or a pair of speech bubbles at 14px. The silhouette depends on curve detail that primitives cannot reproduce at that size, so the official path is rasterised at 224px, cropped to its ink, and downsampled. Icons are white on transparency; the badge CSS supplies the colour.
 
 ## Critical settings-persistence invariant
 
