@@ -464,11 +464,11 @@ local function ServersView()
   return rx:Div({ class = { tabView = true, hidden = state.activeTab ~= 'servers' } }, {
     rx:Div({ class = 'toolbar' }, {
       rx:Input({ type = 'text', value = state.query, placeholder = 'Search name or description...', onchange = function(e) state.query = e.Params.value; bump() end }),
-      rx:Button({
+      rx:Span('X', {
         class = { clearSearch = true, hidden = #(state.query or '') == 0 },
         title = 'Clear search',
         onclick = function() state.query = ''; bump() end
-      }, 'X')
+      })
     }),
     rx:Div({ class = 'servers' }, function()
       if state.loading then return { rx:Div('Loading community servers...', { class = 'loading' }) } end

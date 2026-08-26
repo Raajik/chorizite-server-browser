@@ -21,6 +21,9 @@ public class UiStructureTests {
         Assert.Contains("clearSearch = true, hidden = #(state.query or '') == 0", lua);
         Assert.Contains("onclick = function() state.query = ''; bump() end", lua);
         Assert.Contains(".clearSearch", ReadRml());
+        // A themed button overflows the toolbar, so this control stays a span.
+        Assert.DoesNotContain("rx:Button({\n        class = { clearSearch", lua);
+        Assert.Contains("rx:Span('X'", lua);
         Assert.DoesNotContain("}, 'GDL')", lua);
         Assert.DoesNotContain("}, 'Refresh')", lua);
     }
