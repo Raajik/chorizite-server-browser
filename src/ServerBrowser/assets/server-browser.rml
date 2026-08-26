@@ -4,28 +4,76 @@
     <script src="server-browser.lua"></script>
     <style>
       * { box-sizing: border-box; }
-      body { width: 820px; font-family: Tahoma; color: #eee; }
+      body { width: 780px; font-family: Tahoma; color: #eee; }
       .inner { background-color: #080808f4; padding: 8px; }
-      h2 { color: #d6a845; margin: 2px 0 8px 0; }
-      .toolbar, .login { display: flex; margin-bottom: 7px; }
-      .toolbar input { flex: 4; }
-      .toolbar button { margin-left: 6px; }
-      .content { display: flex; height: 390px; }
-      .servers { width: 430px; overflow-y: auto; border: 1px; border-color: #80652e; }
-      .server { padding: 5px; border-bottom: 1px; border-color: #493b20; }
-      .server:hover, .selected { background-color: #735b2866; }
+      h2 { color: #d6a845; margin: 1px 0 5px 0; font-size: 20px; text-align: center; }
+      h3 { color: #efd07d; margin: 0; }
+      button { margin-left: 4px; }
+      .hidden { display: none; }
+      .tabs { display: flex; justify-content: center; margin-bottom: 6px; }
+      .tabs button { width: 130px; }
+      .tabs .active { color: #fff3c4; border-color: #d6a845; background-color: #735b2877; }
+      .toolbar { display: flex; margin-bottom: 6px; }
+      .toolbar input { flex: 1; min-width: 0; }
+
+      .servers { width: 100%; height: 340px; overflow-y: auto; border: 1px; border-color: #80652e; }
+      .server { padding: 7px 9px; min-height: 66px; border-bottom: 1px; border-color: #493b20; }
+      .server:hover { background-color: #735b2844; }
+      .server.selected { background-color: #735b2877; border-left: 3px; border-left-color: #d6a845; }
+      .server.filtered { display: none; }
+      .server-heading { display: flex; align-items: center; }
+      .title-block { display: flex; align-items: center; flex: 1; min-width: 180px; }
       .server h3 { color: #efd07d; font-size: 16px; margin: 0; }
-      .server .meta { color: #bdb6a4; font-size: 12px; }
-      .count { float: right; color: #7fdb88; }
-      .details { flex: 1; padding: 8px 10px; overflow-y: auto; }
-      .details h3 { color: #efd07d; margin: 0 0 5px 0; }
-      .description { color: #ddd2bd; }
+      .title-block .endpoint { margin-left: 7px; font-size: 11px; white-space: nowrap; }
+      .server-footer { display: flex; align-items: flex-end; margin: 4px 0 0 22px; }
+      .server-badges { display: flex; align-items: center; justify-content: flex-end; margin-left: 8px; }
+      .tag { display: inline-block; margin-right: 4px; padding: 2px 5px; color: #bdb6a4; background-color: #181611; border: 1px; border-color: #403929; border-radius: 3px; font-size: 11px; }
+      .pve { color: #79cfff; }
+      .pvp { color: #ff7474; }
+      .statusStable { color: #7fdb88; }
+      .statusDevelopment { color: #f0ce62; }
+      .statusExperimental { color: #f3a35c; }
+      .favorite { width: 18px; height: 17px; margin-right: 4px; cursor: pointer; }
+      .favorite img { width: 17px; height: 17px; }
+      .stats { width: 76px; text-align: right; font-size: 11px; }
+      .stats span { display: block; }
+      .count { color: #7fdb88; font-size: 16px; line-height: 17px; }
+      .ping { color: #8ec9e8; }
+      .discord-badge { width: 23px; height: 19px; margin-right: 0; padding: 1px 3px; text-align: center; }
+      .discord-icon { color: white; background-color: #312f48; border-color: #5865f2; cursor: pointer; }
+      .discord-icon:hover { background-color: #7289da; }
+      .discord-placeholder { border-color: #343434; }
+      .discord-icon img { width: 14px; height: 14px; }
+      .description { flex: 1; color: #cfc5b2; margin: 0; font-size: 12px; }
       .endpoint { color: #8ec9e8; }
-      .login { border-top: 1px; border-color: #80652e; padding-top: 8px; }
-      .field { flex: 1; margin-right: 7px; }
+
+      .launch-panel { min-height: 88px; border-top: 1px; border-color: #80652e; padding-top: 6px; }
+      .account-choices { display: flex; min-height: 24px; overflow-x: auto; margin-bottom: 4px; }
+      .accountChoice.checked { color: #7fdb88; border-color: #7fdb88; }
+      .client-settings { display: flex; margin-bottom: 5px; }
+      .toggle { width: 180px; margin-left: 0; }
+      .toggle.enabled { color: #7fdb88; }
+      .alternatePath { flex: 1; min-width: 0; margin-left: 5px; }
+      .launch { width: 180px; font-weight: bold; }
+      .launch.disabled { color: #777; border-color: #4a4438; }
+
+      .account-actions { display: flex; justify-content: flex-end; margin-bottom: 6px; }
+      .accounts-list { height: 170px; overflow-y: auto; border: 1px; border-color: #80652e; }
+      .account-row { display: flex; align-items: center; padding: 5px; border-bottom: 1px; border-color: #493b20; }
+      .account-row .accountChoice { width: 130px; text-align: left; }
+      .account-name { width: 145px; }
+      .account-name h3 { font-size: 14px; }
+      .account-server { flex: 1; color: #8ec9e8; }
+      .danger { color: #ff8787; }
+      .empty { padding: 20px; text-align: center; }
+      .account-form, .settings { border-top: 1px; border-color: #80652e; padding-top: 7px; margin-top: 7px; }
+      .account-form h3, .settings h3 { margin-bottom: 5px; }
+      .form-row { display: flex; align-items: flex-end; margin-bottom: 5px; }
+      .field { flex: 1; min-width: 0; margin-right: 5px; }
       .field label { display: block; color: #d6a845; font-size: 12px; }
       .field input { width: 100%; }
-      .launch { width: 110px; font-weight: bold; }
+      .default-server { flex: 1; color: #8ec9e8; }
+      .muted { color: #8d877a; }
       .error { color: #ff8787; }
       .loading { color: #d6a845; padding: 12px; }
     </style>

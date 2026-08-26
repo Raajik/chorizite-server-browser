@@ -19,5 +19,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="../../src/ServerBrowser/assets/server-browser.lua" Link="assets/server-browser.lua" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../src/ServerBrowser/assets/server-browser.rml" Link="assets/server-browser.rml" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

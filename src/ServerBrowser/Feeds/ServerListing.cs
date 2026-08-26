@@ -12,6 +12,7 @@ public sealed class ServerListing {
     public string WebsiteUrl { get; init; } = "";
     public string DiscordUrl { get; init; } = "";
     public int? PlayerCount { get; set; }
+    public int? PingMs { get; set; }
     public string CountAge { get; set; } = "";
     public string Endpoint => $"{Host}:{Port}";
 }

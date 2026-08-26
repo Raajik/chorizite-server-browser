@@ -7,6 +7,9 @@ using System.Xml.Linq;
 namespace ServerBrowser.Feeds;
 
 public static class ServerFeedParser {
+    private const string MissingDescription =
+        "No description has been provided. Server owners can update this listing at github.com/acresources/serverslist.";
+
     public static IReadOnlyList<ServerListing> ParseServers(string xml) {
         var document = XDocument.Parse(xml, LoadOptions.None);
         return document.Descendants("ServerItem")
@@ -48,19 +51,24 @@ public static class ServerFeedParser {
             return null;
         }
 
+        var endpoint = $"{host}:{port}";
+
         return new ServerListing {
-            Id = Value(element, "id"),
-            Name = Value(element, "name"),
-            Description = Value(element, "description"),
-            Emulator = Value(element, "emu"),
+            Id = OrDefault(Value(element, "id"), endpoint),
+            Name = OrDefault(Value(element, "name"), "Unnamed server"),
+            Description = OrDefault(Value(element, "description"), MissingDescription),
+            Emulator = OrDefault(Value(element, "emu"), "Unknown"),
             Host = host,
             Port = port,
-            Type = Value(element, "type"),
-            Status = Value(element, "status"),
+            Type = OrDefault(Value(element, "type"), "Unspecified"),
+            Status = OrDefault(Value(element, "status"), "Unspecified"),
             WebsiteUrl = Value(element, "website_url"),
             DiscordUrl = Value(element, "discord_url")
         };
     }
 
     private static string Value(XElement element, string name) => element.Element(name)?.Value ?? "";
+
+    private static string OrDefault(string value, string fallback) =>
+        string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
 }

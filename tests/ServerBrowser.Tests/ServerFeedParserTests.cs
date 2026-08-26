@@ -70,4 +70,32 @@ public class ServerFeedParserTests {
         var server = Assert.Single(ServerFeedParser.ParseServers(xml));
         Assert.Equal("Good", server.Name);
     }
+
+    [Fact]
+    public void ParseServersNormalizesSparseButLaunchableEntries() {
+        const string xml = """
+            <ArrayOfServerItem>
+              <ServerItem>
+                <id></id>
+                <name></name>
+                <description></description>
+                <emu></emu>
+                <server_host>sparse.example</server_host>
+                <server_port>9010</server_port>
+                <type></type>
+                <status></status>
+              </ServerItem>
+            </ArrayOfServerItem>
+            """;
+
+        var server = Assert.Single(ServerFeedParser.ParseServers(xml));
+
+        Assert.Equal("sparse.example:9010", server.Id);
+        Assert.Equal("Unnamed server", server.Name);
+        Assert.Contains("acresources/serverslist", server.Description);
+        Assert.Equal("Unknown", server.Emulator);
+        Assert.Equal("Unspecified", server.Type);
+        Assert.Equal("Unspecified", server.Status);
+        Assert.Equal("sparse.example:9010", server.Endpoint);
+    }
 }

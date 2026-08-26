@@ -1,0 +1,332 @@
+# Community Server Browser — Handoff
+
+## Project boundary
+
+This is a **standalone Chorizite launcher plugin**. It is intentionally separate from Juggernaut.
+
+- Server Browser workspace: `A:\ai\projects\chorizite-server-browser`
+- Juggernaut workspace: `A:\ai\projects\ac-juggernaut`
+- Installed plugin: `C:\Games\Chorizite\plugins\ServerBrowser`
+- Runtime data/cache: `C:\Games\Chorizite\data\ServerBrowser`
+
+**Do not add server-list, launcher, account, or server-discovery code to Juggernaut.** Juggernaut is a Chorizite `Client`-environment plugin for in-game combat/gameplay automation. Server Browser is a Chorizite `Launcher`-environment plugin for choosing and launching servers.
+
+## Current version and status
+
+Current plugin version: **0.3.0**
+
+Verified on Windows 11 with:
+
+- Chorizite core/launcher 0.0.15
+- Lua plugin 0.0.13
+- RmlUi plugin 0.0.11
+- Launcher plugin 0.0.9
+- .NET 8 x86 runtime
+
+Last verification:
+
+- 26/26 tests passing
+- build succeeds with 0 warnings and 0 errors
+- Chorizite discovers `Community Server Browser (0.3.0)`
+- panel renders and live community data loads
+- TreeStats counts merge and sort correctly
+- passwords are absent from plugin JSON and persisted only in Windows Credential Manager
+
+## Important Chorizite version constraint
+
+Use **Chorizite 0.0.15**, not GitHub's nominal latest 0.0.18.
+
+The official plugin index still pairs Lua 0.0.13, RmlUi 0.0.11, Launcher 0.0.9, and AC 0.0.5 with Chorizite 0.0.15. Those plugins are binary-incompatible with the rendering API in Chorizite 0.0.18 (`IRenderInterface` versus `IRenderer`). Installing 0.0.18 with the indexed plugins produces a blank launcher and `TypeLoadException`/`MissingMethodException` errors.
+
+Chorizite also expects `%LOCALAPPDATA%\Temp\chorizite` to exist because its assembly load context enumerates that directory before creating it. The launcher has been run successfully with that directory present.
+
+## Purpose
+
+Replace Chorizite's manual `host:port` entry with a browsable public-server interface. Selecting a server supplies its endpoint directly to `ILauncherBackend.LaunchClient(...)`.
+
+## Data sources
+
+### Community server list
+
+`https://raw.githubusercontent.com/acresources/serverslist/master/Servers.xml`
+
+This is the community list used by current ThwargLauncher releases. Schema fields consumed:
+
+- `id`
+- `name`
+- `description`
+- `emu`
+- `server_host`
+- `server_port`
+- `type`
+- `status`
+- `website_url`
+- `discord_url`
+
+Server-list edits are made through:
+
+`https://github.com/acresources/serverslist`
+
+### Optional player counts
+
+`http://treestats.net/player_counts-latest.json`
+
+Counts are matched to server names case-insensitively. Counts are optional and never block browsing or launching.
+
+### Cache
+
+Last successful responses are cached under:
+
+`C:\Games\Chorizite\data\ServerBrowser\cache`
+
+Files:
+
+- `servers.xml`
+- `player-counts.json`
+
+If the network fetch fails, cached community XML is used. Player-count failure is ignored.
+
+## Current features
+
+- automatic feed loading at panel startup
+- cached offline/failure fallback
+- population-first sorting when counts are available
+- text search across name, description, and server type
+- server cards showing emulator, PvE/PvP type, status, and player count
+- full-width server cards with descriptions directly under their metadata
+- endpoint shown in parentheses directly beside each server title
+- compact emulator/type/status/Discord badges at the card's bottom-right and prominent population typography
+- centered title and separate Servers/Accounts tabs
+- ICMP latency shown beside population (`N/A` when the host blocks ping)
+- toggleable star favorites persisted by server ID
+- color-coded metadata:
+  - PvE: light blue
+  - PvP: red
+  - Stable: green
+  - Development: yellow
+  - Experimental: orange
+- clickable Discord invite badge when a URL exists
+- muted same-width placeholder when Discord is unavailable
+- multiple saved accounts with aliases and default servers
+- checked-account launch against either the selected server or account defaults
+- compact primary `Launch` action; with no saved accounts it opens the account setup tab
+- global default client path and per-server alternate-client overrides
+- Windows Credential Manager password storage
+- explicit password-protected encrypted backup/import
+- client path, last endpoint, favorites, and alternate-client persistence
+- direct launch through Chorizite's `ILauncherBackend`
+- generic placeholders for sparse-but-launchable community entries
+
+## Sparse listing behavior
+
+A listing is accepted if it has a non-empty host and a valid port from 1–65535. Missing display metadata is normalized:
+
+- missing ID → endpoint (`host:port`)
+- missing name → `Unnamed server`
+- missing description → guidance linking maintainers to `github.com/acresources/serverslist`
+- missing emulator → `Unknown`
+- missing type/status → `Unspecified`
+
+Using endpoint as a fallback ID is important: blank/duplicate IDs can cause ambiguous selection and virtual-DOM patch behavior.
+
+## Architecture
+
+### C# plugin/runtime layer
+
+- `src/ServerBrowser/ServerBrowserPlugin.cs`
+  - Chorizite assembly plugin entry point
+  - launcher-only environment
+  - creates the RmlUi panel
+  - exposes `RefreshServers()`, `GetDefaultClientPath()`, and `Launch(...)` to Lua
+
+- `src/ServerBrowser/Feeds/ServerFeedClient.cs`
+  - `HttpClient` fetching
+  - user agent and timeout
+  - cache reads/writes
+  - optional count failure handling
+
+- `src/ServerBrowser/Feeds/ServerFeedParser.cs`
+  - XML parsing and validation
+  - sparse field normalization
+  - TreeStats JSON parsing
+  - count merge and population sorting
+
+- `src/ServerBrowser/Feeds/ServerListing.cs`
+- `src/ServerBrowser/Feeds/PlayerCount.cs`
+- `src/ServerBrowser/Feeds/ServerPingProbe.cs`
+  - bounded concurrent ICMP probes
+  - unavailable results remain nullable and render as `N/A`
+
+### Account and credential layer
+
+- `src/ServerBrowser/Accounts/AccountManager.cs`
+  - non-secret account metadata in `accounts.json`
+  - account add/edit/delete and backup orchestration
+- `src/ServerBrowser/Accounts/WindowsCredentialStore.cs`
+  - generic credentials under `Raajik.Chorizite.ServerBrowser/<account-id>`
+  - passwords are never written to plugin JSON files
+- `src/ServerBrowser/Accounts/CredentialBackup.cs`
+  - AES-256-GCM authenticated encryption
+  - PBKDF2-SHA256 with 600,000 iterations and a random salt
+  - explicit export/import; backup passphrases are never saved
+
+If the Windows profile is lost, Credential Manager entries are not independently recoverable. The encrypted export is the recovery mechanism, and losing its passphrase makes that backup unrecoverable by design.
+
+### RmlUi/Lua presentation layer
+
+- `src/ServerBrowser/assets/server-browser.rml`
+  - panel layout and styling
+
+- `src/ServerBrowser/assets/server-browser.lua`
+  - reactive presentation state
+  - search
+  - selection
+  - local settings persistence
+  - launch invocation
+
+- `src/ServerBrowser/assets/discord.png`
+  - bundled Discord-style indicator
+- `src/ServerBrowser/assets/star-on.png` and `star-off.png`
+  - bundled favorite icons (the indexed RmlUi font lacks star glyphs)
+
+- `scripts/make_discord_icon.py`
+  - reproducibly generates the bundled icon
+
+## Critical RmlUi invariant
+
+**Do not implement filtering by adding/removing server rows from the virtual DOM.**
+
+RmlUi 0.0.11 can crash natively with access violation `0xc0000005` inside:
+
+- `RmlUiNet.Element.SetInnerRml`
+- `RmlUi.Lib.RmlUi.VDom.VirtualDom.Patch`
+
+The crash was reproduced when clicking the old ACE filter, which removed many sibling rows in one reactive update.
+
+Current safe approach:
+
+1. Always return one `ServerRow` virtual node for every server.
+2. Compute whether it matches search.
+3. Toggle the `filtered` CSS class.
+4. `.server.filtered { display: none; }`
+
+Regression coverage is in `UiStructureTests.FilteringKeepsEveryServerRowInTheVirtualDom`.
+
+Preserve this stable-child-tree approach for any future filters or sorting UI. If live re-sorting is added, test it carefully—the safest design may be to calculate order only when replacing the entire feed after a network refresh, not on button/key reactions.
+
+## Build, test, and deploy
+
+From the project root:
+
+```bash
+./scripts/deploy.sh
+```
+
+The script:
+
+1. runs all tests
+2. builds the plugin
+3. copies DLL/PDB/runtime metadata/manifest/assets to Chorizite
+
+Override the Chorizite installation directory if needed:
+
+```bash
+CHORIZITE_HOME='D:/Games/Chorizite' ./scripts/deploy.sh
+```
+
+Direct commands:
+
+```bash
+dotnet test tests/ServerBrowser.Tests/ServerBrowser.Tests.csproj
+dotnet build src/ServerBrowser/ServerBrowser.csproj
+```
+
+## Test coverage
+
+`tests/ServerBrowser.Tests/ServerFeedParserTests.cs`
+
+- community XML parsing
+- endpoint generation
+- case-insensitive TreeStats count merge
+- population sorting
+- invalid host/port rejection
+- sparse listing normalization
+
+`tests/ServerBrowser.Tests/UiStructureTests.cs`
+
+- stable server-row virtual-DOM tree during filtering
+- search-only toolbar (removed ACE/GDL/Refresh)
+- PvE/PvP and status style predicates
+- Discord icon and placeholder slots
+- centered full-width server/account tab structure
+- inline descriptions, favorite icons, ping labels, and alternate-client controls
+- credential-backed account UI operations
+
+`tests/ServerBrowser.Tests/AccountManagerTests.cs`
+
+- metadata/password separation
+- Windows Credential Manager round trip and cleanup
+- password-protected encrypted backup round trip
+
+`tests/ServerBrowser.Tests/ServerPingProbeTests.cs`
+
+- reachable-host ICMP latency
+- population of nullable latency on server listings
+
+## Runtime verification
+
+Chorizite logs to:
+
+`C:\Games\Chorizite\data\logs\log.txt`
+
+Successful startup includes lines similar to:
+
+```text
+Found 7 plugin manifests: ... Community Server Browser(0.3.0)
+Showing document Server Browser C:\Games\Chorizite\plugins\ServerBrowser\assets\server-browser.rml
+```
+
+The unrelated `TestPlugin` texture warning comes from Chorizite's plugin index/UI and is not a Server Browser failure.
+
+## Known limitations
+
+- Website values are displayed as text; they are not yet external-link buttons.
+- Discord badges open only validated `https://discord.gg/...` links through the Windows default URL handler. The badge click stops propagation so it does not change the selected server.
+- Ping uses ICMP rather than the AC game port (the game endpoint is not a TCP listener). Servers that block ICMP correctly show `N/A`.
+- Account backup/export currently uses a typed path rather than a native file-picker dialog.
+- TreeStats name matching is exact except for case; aliases such as `ACPrime` versus `Asheron Prime` will not automatically match.
+- There is no manual refresh button by design; the panel loads automatically and uses cache fallback.
+- Search reacts through RmlUi's `onchange` behavior, which may be commit/focus based rather than every keystroke depending on the control implementation.
+- The plugin relies on the older indexed Chorizite stack until official plugins are rebuilt for newer Chorizite core releases.
+
+## Suggested next work
+
+Priority order:
+
+1. Add a validated website link action using the same external-URL pattern as Discord.
+2. Add tested TreeStats alias mapping for known name mismatches.
+3. Add a native file-picker bridge for encrypted account backup import/export.
+4. Consider favorite-first ordering only if it can preserve the RmlUi virtual-DOM child tree safely.
+5. Add recent servers without storing additional credentials.
+6. Consider replacing Chorizite's original simple login screen entirely, rather than showing Server Browser as a separate panel, only if this can be done without coupling to private Launcher plugin internals.
+7. Package/publish the plugin in Raajik's GitHub repository and optionally submit it to Chorizite's plugin index.
+
+## Repository state at handoff
+
+The project is initialized as a Git repository but changes may still be uncommitted. Before publishing:
+
+```bash
+git status
+git add .
+git commit -m "Add Chorizite community server browser"
+```
+
+Do not commit generated `bin/`, `obj/`, test results, or runtime cache files; `.gitignore` excludes them.
+
+## Ownership and attribution
+
+- Author: **Raajik**
+- Intended repository: `https://github.com/Raajik/chorizite-server-browser`
+- Juggernaut repository: `https://github.com/Raajik/ac-juggernaut`
+
+Treat these as independent products with independent issue tracking and release histories.

@@ -36,6 +36,12 @@ public sealed class ServerFeedClient : IDisposable {
             // Counts are helpful but must never prevent browsing or launching.
         }
 
+        await ServerPingProbe.PopulateAsync(
+            servers,
+            TimeSpan.FromMilliseconds(750),
+            maxConcurrency: 16,
+            cancellationToken);
+
         return servers.ToList();
     }
 
