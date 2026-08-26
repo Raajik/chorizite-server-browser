@@ -18,6 +18,9 @@ public class UiStructureTests {
 
         Assert.Contains("placeholder = 'Search name or description...'", lua);
         Assert.DoesNotContain("}, 'ACE')", lua);
+        Assert.Contains("clearSearch = true, hidden = #(state.query or '') == 0", lua);
+        Assert.Contains("onclick = function() state.query = ''; bump() end", lua);
+        Assert.Contains(".clearSearch", ReadRml());
         Assert.DoesNotContain("}, 'GDL')", lua);
         Assert.DoesNotContain("}, 'Refresh')", lua);
     }
