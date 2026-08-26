@@ -13,7 +13,7 @@ This is a **standalone Chorizite launcher plugin**. It is intentionally separate
 
 ## Current version and status
 
-Current plugin version: **0.5.1**
+Current plugin version: **0.6.0**
 
 Verified on Windows 11 with:
 
@@ -98,6 +98,7 @@ If the network fetch fails, cached community XML is used. Player-count failure i
 - compact emulator/type/status/Discord badges at the card's bottom-right and prominent population typography
 - centered title and separate Servers/Accounts tabs
 - ICMP latency shown beside population (`N/A` when the host blocks ping)
+- red `Offline` instead of `N/A` when the host name no longer resolves
 - toggleable star favorites persisted by server ID
 - favorites pinned above the feed as compact single-line cards
 - manual favorite ordering through per-row up/down arrows persisted in `favoriteOrder`
@@ -321,6 +322,7 @@ dotnet build src/ServerBrowser/ServerBrowser.csproj
 
 - reachable-host ICMP latency
 - population of nullable latency on server listings
+- unresolvable hosts reported as `HostResolved = false` with no latency
 
 ## Runtime verification
 
@@ -341,6 +343,25 @@ The unrelated `TestPlugin` texture warning comes from Chorizite's plugin index/U
 
 - Discord badges open only validated `https://discord.gg/...` links through the Windows default URL handler. The badge click stops propagation so it does not change the selected server.
 - Ping uses ICMP rather than the AC game port (the game endpoint is not a TCP listener). Servers that block ICMP correctly show `N/A`.
+
+### Measured ICMP reality of the community list
+
+All 43 unique hosts were probed directly with a 3 second budget and three attempts each:
+
+| Result | Hosts |
+| --- | --- |
+| ICMP reply | 23 |
+| Silent (firewall drops echo) | 15 |
+| DNS failure | 3 |
+| Destination port unreachable | 2 |
+
+Roughly half the list therefore cannot show a latency number, and that is the servers' behaviour rather than a plugin defect.
+
+The slowest successful reply was **127 ms** and no successful DNS lookup exceeded **106 ms**, so the 750 ms budget in `ServerFeedClient` is already generous. Raising it does not recover any host; the silent ones stay silent at 3 seconds. Do not "fix" missing pings by increasing the timeout.
+
+Hosts that fail DNS are reported separately as `Offline`, because that indicates a genuinely stale listing rather than a firewall policy.
+
+Meaningful reachability for the silent majority would require speaking AC's UDP login handshake the way ThwargLauncher does, which is a much larger protocol job.
 - Account backup/export currently uses a typed path rather than a native file-picker dialog.
 - TreeStats name matching is exact except for case; aliases such as `ACPrime` versus `Asheron Prime` will not automatically match.
 - There is no manual refresh button by design; the panel loads automatically and uses cache fallback.
@@ -351,9 +372,9 @@ The unrelated `TestPlugin` texture warning comes from Chorizite's plugin index/U
 
 Priority order:
 
-1. Add tested TreeStats alias mapping for known name mismatches.
-2. Add a native file-picker bridge for encrypted account backup import/export.
-3. Consider favorite-first ordering only if it can preserve the RmlUi virtual-DOM child tree safely.
+1. Consider an AC UDP handshake probe so ICMP-silent servers can still show real reachability.
+2. Add tested TreeStats alias mapping for known name mismatches.
+3. Add a native file-picker bridge for encrypted account backup import/export.
 4. Add recent servers without storing additional credentials.
 5. Consider replacing Chorizite's original simple login screen entirely, rather than showing Server Browser as a separate panel, only if this can be done without coupling to private Launcher plugin internals.
 6. Package/publish the plugin in Raajik's GitHub repository and optionally submit it to Chorizite's plugin index.

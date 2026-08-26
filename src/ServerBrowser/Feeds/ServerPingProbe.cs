@@ -1,11 +1,15 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Net.NetworkInformation;
+using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace ServerBrowser.Feeds;
+
+public readonly record struct PingProbeResult(bool HostResolved, int? LatencyMs);
 
 public static class ServerPingProbe {
     public static async Task PopulateAsync(
@@ -17,10 +21,9 @@ public static class ServerPingProbe {
         var probes = servers.Select(async server => {
             await gate.WaitAsync(cancellationToken);
             try {
-                server.PingMs = await MeasureAsync(
-                    server.Host,
-                    timeout,
-                    cancellationToken);
+                var result = await MeasureAsync(server.Host, timeout, cancellationToken);
+                server.HostResolved = result.HostResolved;
+                server.PingMs = result.LatencyMs;
             }
             finally {
                 gate.Release();
@@ -29,18 +32,28 @@ public static class ServerPingProbe {
         await Task.WhenAll(probes);
     }
 
-    public static async Task<int?> MeasureAsync(
+    public static async Task<PingProbeResult> MeasureAsync(
         string host,
         TimeSpan timeout,
         CancellationToken cancellationToken = default) {
+        IPAddress address;
+        try {
+            var addresses = await Dns.GetHostAddressesAsync(host, cancellationToken);
+            if (addresses.Length == 0) return new PingProbeResult(false, null);
+            address = addresses[0];
+        }
+        catch (Exception ex) when (ex is SocketException or ArgumentException) {
+            return new PingProbeResult(false, null);
+        }
+
         using var ping = new Ping();
         try {
-            var reply = await ping.SendPingAsync(host, (int)timeout.TotalMilliseconds)
+            var reply = await ping.SendPingAsync(address, (int)timeout.TotalMilliseconds)
                 .WaitAsync(cancellationToken);
-            return reply.Status == IPStatus.Success ? (int)reply.RoundtripTime : null;
+            return new PingProbeResult(true, reply.Status == IPStatus.Success ? (int)reply.RoundtripTime : null);
         }
         catch (Exception ex) when (ex is PingException or OperationCanceledException) {
-            return null;
+            return new PingProbeResult(true, null);
         }
     }
 }

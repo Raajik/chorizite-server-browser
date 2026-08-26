@@ -19,6 +19,7 @@ The last successful responses are cached locally. Player-count failure never blo
 - search across server names and descriptions
 - full-width server cards with inline descriptions
 - server/account tabs for server-first and account-first launching
+- ICMP latency per server, with `Offline` marking listings whose host no longer resolves
 - toggleable server favorites, pinned to the top of the list as compact cards
 - manual favorite ordering with per-row up/down arrows
 - color-coded PvE/PvP and stability/development status tags

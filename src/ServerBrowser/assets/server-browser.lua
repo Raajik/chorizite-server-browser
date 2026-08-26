@@ -211,6 +211,12 @@ local refresh = async(function()
   state.revision = state.revision + 1
 end)
 
+local function pingLabel(server)
+  if server.PingMs ~= nil then return 'Ping: ' .. tostring(server.PingMs) .. ' ms' end
+  if server.HostResolved == false then return 'Offline' end
+  return 'Ping: N/A'
+end
+
 -- RmlUi rejects the CSS `order` property, so favorites are ordered here instead.
 -- Every server still yields exactly one row; only their sequence changes.
 local function pinnedFirst()
@@ -275,7 +281,12 @@ local function ServerRow(server, isFiltered)
       }),
       rx:Div({ class = 'stats' }, {
         rx:Span(server.PlayerCount ~= nil and tostring(server.PlayerCount) or 'N/A', { class = 'count', title = 'Players' }),
-        rx:Span(server.PingMs ~= nil and ('Ping: ' .. tostring(server.PingMs) .. ' ms') or 'Ping: N/A', { class = 'ping' })
+        rx:Span(pingLabel(server), {
+          class = { ping = true, offline = server.HostResolved == false },
+          title = server.HostResolved == false
+            and 'This host name no longer resolves, so the listing looks dead'
+            or 'ICMP latency; N/A means the host does not answer pings'
+        })
       })
     }),
     rx:Div({ class = 'server-footer' }, {

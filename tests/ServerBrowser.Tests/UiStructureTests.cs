@@ -38,6 +38,17 @@ public class UiStructureTests {
     }
 
     [Fact]
+    public void UnresolvableHostsReadOfflineRatherThanUnknownPing() {
+        var lua = ReadLua();
+        var rml = ReadRml();
+
+        Assert.Contains("if server.HostResolved == false then return 'Offline' end", lua);
+        Assert.Contains("return 'Ping: N/A'", lua);
+        Assert.Contains("offline = server.HostResolved == false", lua);
+        Assert.Contains(".ping.offline", rml);
+    }
+
+    [Fact]
     public void ServerRowsRenderWebsiteSlots() {
         var lua = ReadLua();
         var rml = ReadRml();
