@@ -229,6 +229,23 @@ public class UiStructureTests {
     }
 
     [Fact]
+    public void ControlsOverrideTheLauncherSkinWithFlatStyling() {
+        var rml = ReadRml();
+
+        // theme.rcss skins button at (0,0,1); .inner scoping is what outranks it.
+        Assert.Matches(@"\.inner button \{[^}]*decorator: none", rml);
+        Assert.Contains(".toolbar input, .field input, .alternatePath {", rml);
+        Assert.Contains(".inner button:hover", rml);
+        Assert.Contains(".inner button[disabled]", rml);
+
+        // Colour overrides must outrank .inner button, so they carry .inner too.
+        Assert.Contains(".inner .danger", rml);
+        Assert.Contains(".inner .launch", rml);
+        Assert.Contains(".inner .toggle", rml);
+        Assert.DoesNotMatch(@"(?m)^\s*button \{", rml);
+    }
+
+    [Fact]
     public void HiddenRuleIsDeclaredLastSoItBeatsTagDisplay() {
         var rml = ReadRml();
 

@@ -13,7 +13,7 @@ This is a **standalone Chorizite launcher plugin**. It is intentionally separate
 
 ## Current version and status
 
-Current plugin version: **0.7.5**
+Current plugin version: **0.8.0**
 
 Verified on Windows 11 with:
 

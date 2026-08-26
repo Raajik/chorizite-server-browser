@@ -8,7 +8,35 @@
       .inner { background-color: #080808f4; padding: 8px; }
       h2 { color: #d6a845; margin: 1px 0 5px 0; font-size: 20px; text-align: center; }
       h3 { color: #efd07d; margin: 0; }
-      button { margin-left: 4px; }
+      /* Flat controls. theme.rcss skins every button with a ninepatch decorator at
+         specificity (0,0,1), so these rules are scoped to .inner to outrank it
+         regardless of sheet order. Removing the decorator is what flattens them. */
+      .inner button {
+        decorator: none;
+        margin: 0 0 0 4px;
+        padding: 4px 9px;
+        border: 1px;
+        border-color: #4b422c;
+        background-color: #17150f;
+        color: #cfc5b2;
+        font-size: 12px;
+        font-effect: none;
+        text-align: center;
+        cursor: pointer;
+      }
+      .inner button:hover { border-color: #d6a845; background-color: #241f14; color: #fff3c4; }
+      .inner button:active { background-color: #2f2717; }
+      .inner button[disabled] { color: #5a554a; border-color: #2a2620; background-color: #131109; }
+      .toolbar input, .field input, .alternatePath {
+        decorator: none;
+        border: 1px;
+        border-color: #4b422c;
+        background-color: #12100b;
+        color: #eee;
+        padding: 3px 5px;
+        font-size: 12px;
+      }
+      .toolbar input:focus, .field input:focus, .alternatePath:focus { border-color: #d6a845; }
       .tabs { display: flex; justify-content: center; margin-bottom: 6px; }
       .tabs button { width: 130px; }
       .tabs .active { color: #fff3c4; border-color: #d6a845; background-color: #735b2877; }
@@ -68,10 +96,11 @@
       .account-choices { display: flex; min-height: 24px; overflow-x: auto; margin-bottom: 4px; }
       .accountChoice.checked { color: #7fdb88; border-color: #7fdb88; }
       .client-settings { display: flex; margin-bottom: 5px; }
-      .toggle { width: 180px; margin-left: 0; }
+      .inner .toggle { width: 180px; margin-left: 0; }
       .toggle.enabled { color: #7fdb88; }
       .alternatePath { flex: 1; min-width: 0; margin-left: 5px; }
-      .launch { width: 180px; font-weight: bold; }
+      /* Flat, but still the primary action: gold edge rather than a skin. */
+      .inner .launch { width: 180px; margin-left: 0; border-color: #80652e; color: #efd07d; font-weight: bold; }
       .launch.disabled { color: #777; border-color: #4a4438; }
 
       .account-actions { display: flex; justify-content: flex-end; margin-bottom: 6px; }
@@ -81,7 +110,8 @@
       .account-name { width: 145px; }
       .account-name h3 { font-size: 14px; }
       .account-server { flex: 1; color: #8ec9e8; }
-      .danger { color: #ff8787; }
+      .inner .danger { color: #ff8787; }
+      .inner .danger:hover { border-color: #ff8787; color: #ffb3b3; }
       .empty { padding: 20px; text-align: center; }
       .account-form, .settings { border-top: 1px; border-color: #80652e; padding-top: 7px; margin-top: 7px; }
       .account-form h3, .settings h3 { margin-bottom: 5px; }
