@@ -66,8 +66,8 @@ internal static class CredentialBackup {
         Rfc2898DeriveBytes.Pbkdf2(password, salt, Iterations, HashAlgorithmName.SHA256, 32);
 
     private static void ValidateMasterPassword(string password) {
-        if (string.IsNullOrWhiteSpace(password) || password.Length < 12) {
-            throw new ArgumentException("Backup passphrase must be at least 12 characters", nameof(password));
+        if (string.IsNullOrWhiteSpace(password)) {
+            throw new ArgumentException("Backup passphrase must not be empty", nameof(password));
         }
     }
 

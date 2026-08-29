@@ -13,7 +13,7 @@ This is a **standalone Chorizite launcher plugin**. It is intentionally separate
 
 ## Current version and status
 
-Current plugin version: **0.8.0**
+Current plugin version: **0.10.6**
 
 Verified on Windows 11 with:
 
@@ -25,9 +25,9 @@ Verified on Windows 11 with:
 
 Last verification:
 
-- 26/26 tests passing
+- 69/69 tests passing
 - build succeeds with 0 warnings and 0 errors
-- Chorizite discovers `Community Server Browser (0.3.0)`
+- Chorizite discovers `Community Server Browser (0.10.6)`
 - panel renders and live community data loads
 - TreeStats counts merge and sort correctly
 - passwords are absent from plugin JSON and persisted only in Windows Credential Manager
@@ -388,6 +388,45 @@ Meaningful reachability for the silent majority would require speaking AC's UDP 
 - There is no manual refresh button by design; the panel loads automatically and uses cache fallback.
 - Search reacts through RmlUi's `onchange` behavior, which may be commit/focus based rather than every keystroke depending on the control implementation.
 - The plugin relies on the older indexed Chorizite stack until official plugins are rebuilt for newer Chorizite core releases.
+
+## Pending user request at this handoff
+
+The repository was clean at tag `v0.8.0` / commit `d24a997`. **All four items below were implemented and verified in 0.9.0** (66/66 tests, deploy succeeded):
+
+1. **12-character backup-passphrase minimum removed.**
+   - `CredentialBackup.ValidateMasterPassword` now rejects only empty/whitespace passphrases.
+   - UI copy is `Backup passphrase` (no length claim).
+   - Regression coverage: `AccountManagerTests.ShortNonEmptyPassphraseCanExportAndImport` and `EmptyOrWhitespacePassphraseIsRejected`.
+
+2. **Server Browser buttons are silent.**
+   - `.inner button` in `server-browser.rml` now sets `click-sound: none;`, outranking the global `click-sound: 0x0A0003B3` in `C:\Games\Chorizite\plugins\RmlUi\assets\theme.rcss`.
+   - `click-sound` is a Chorizite-registered RCSS property (RmlUi docs' canonical user-defined property; default `none`). Pinned by `ControlsOverrideTheLauncherSkinWithFlatStyling`.
+
+3. **Discord badge moved ahead of emulator/type/status.**
+   - The separate `.server-links` column is gone; both link icons fold into the top of `.server-badges` (Discord first, then website, then emulator/type/status), so positions are consistent regardless of which servers have a Discord.
+   - Stable virtual-DOM invariant preserved: both icon nodes always exist per row, toggled via `.hidden`.
+   - Regression coverage: `UiStructureTests.LinkIconsLiveAtTheTopOfTheBadgeColumnWithDiscordFirst`. Live 800x630 launcher capture still pending.
+
+4. **ThwargLauncher import added.**
+
+**0.9.1 → 0.10.6 iteration (all verified live):**
+
+- **Alternate-client browse dialog**: CLR COM interop cannot run inside Chorizite's collectible plugin ALC ("Typelib export" 0x80131165), and raw IFileOpenDialog vtable calls returned null results (GetResult empirically at slot 16, not 17; even then the result was unreliable). Final solution: `GetOpenFileNameW` from comdlg32 — a single documented P/Invoke, no COM. Runs on a dedicated STA thread.
+- **Per-server account pickers**: each server card has a multi-launch checkbox (green), a chevron on favorites, and an expandable picker box. Accounts show as checkbox + per-server favorite star (pins to the top of that server's list, alphabetical within pinned/unpinned groups). Select all/Clear all and an "Alternate Client" toggle live in the picker header; toggling reveals an inline path bar + Browse button. Picks, pins, ticks, and alternate-client paths all persist in settings.json.
+- **State-persistence lesson**: `serverAccounts`/`serverAccountFavorites` were saved but never seeded into `rx:CreateState` — a load/save asymmetry that silently wiped them each restart. Any new persisted table must be added to BOTH the load path and the state initializer.
+- **Single-handler rule**: nested onclick handlers (row + star) crash the RmlUi plugin's instance cache (`IndexOutOfRangeException` in `RmlInstanceCache`) during event dispatch. One onclick per row inspects `e.TargetElement` classes instead. Also: rx proxy tables report `#table == 0` — all count checks must use `ipairs` counting helpers.
+- **Launch button states**: grayed outline = nothing valid; transparent outline = accounts exist but nothing ticked+picked; bright filled red (`#c01818`) = armed (ticked server with picks). Readiness = ticked server with picks, checked via the same rules `beginLaunch` uses.
+- **Removed**: drag-to-reorder favorites (distorted drag ghost in RmlUi 0.0.11), the separate Alternate Client tab (folded into pickers), the bottom account-choice strip (superseded by per-server pickers).
+- **Misc**: passphrase minimum removed (0.9.0); opaque panel background; centered 780px body; buttons flattened with scoped `click-sound: none`; three-letter search clear; ThwargLauncher import (Accounts.txt + Profiles JSON + UserServerList.xml via redacting schema inspection only — never real values).
+   - `src/ServerBrowser/Accounts/ThwargLauncherImporter.cs`: pure parsers (`ThwargLauncherParser`) for `Accounts.txt` (comma-separated key=value rows: `Name`, `Password`, optional `Alias`; header line and `Version=` skipped), `Profiles/*.txt` (JSON `CharacterSettings` → per-account first-character server), and `Servers/UserServerList.xml` (`connect_string` as `host:port`).
+   - `ThwargLauncherImporter.Import()` writes metadata through `AccountManager` and passwords only through `ISecretStore`. Collision behavior: an existing saved account with the same normalized username is updated in place (existing default server preserved); imports never touch differently-named accounts. Unmatched Thwarg server names leave the default empty.
+   - `ServerBrowserPlugin.ImportThwargLauncher()` reads `%APPDATA%\ThwargLauncher\Accounts.txt` + newest `Profiles/*.txt`, matches Thwarg server names to the live feed by endpoint then name, and returns an "Imported N and updated M" summary. Exposed to Lua and reachable via the `Import from ThwargLauncher` button in the Accounts tab.
+   - Fixture-based synthetic tests in `ThwargLauncherImporterTests.cs` (never real launcher data). Real-file schema was inspected with redacting scripts only (key names/lengths, never values).
+   - RynLauncher remains unsupported (only log files were ever located; not mined).
+
+## Pending user request at the previous handoff
+
+(Completed — see above.)
 
 ## Suggested next work
 

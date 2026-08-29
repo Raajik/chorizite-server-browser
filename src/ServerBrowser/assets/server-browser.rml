@@ -4,8 +4,8 @@
     <script src="server-browser.lua"></script>
     <style>
       * { box-sizing: border-box; }
-      body { width: 780px; font-family: Tahoma; color: #eee; }
-      .inner { background-color: #080808f4; padding: 8px; }
+      body { width: 780px; margin: 0 auto; font-family: Tahoma; color: #eee; }
+      .inner { background-color: #080808; padding: 8px; }
       h2 { color: #d6a845; margin: 1px 0 5px 0; font-size: 20px; text-align: center; }
       h3 { color: #efd07d; margin: 0; }
       /* Flat controls. theme.rcss skins every button with a ninepatch decorator at
@@ -13,6 +13,7 @@
          regardless of sheet order. Removing the decorator is what flattens them. */
       .inner button {
         decorator: none;
+        click-sound: none;
         margin: 0 0 0 4px;
         padding: 4px 9px;
         border: 1px;
@@ -27,7 +28,7 @@
       .inner button:hover { border-color: #d6a845; background-color: #241f14; color: #fff3c4; }
       .inner button:active { background-color: #2f2717; }
       .inner button[disabled] { color: #5a554a; border-color: #2a2620; background-color: #131109; }
-      .toolbar input, .field input, .alternatePath {
+      .toolbar input, .field input {
         decorator: none;
         border: 1px;
         border-color: #4b422c;
@@ -36,7 +37,7 @@
         padding: 3px 5px;
         font-size: 12px;
       }
-      .toolbar input:focus, .field input:focus, .alternatePath:focus { border-color: #d6a845; }
+      .toolbar input:focus, .field input:focus { border-color: #d6a845; }
       .tabs { display: flex; justify-content: center; margin-bottom: 6px; }
       .tabs button { width: 130px; }
       .tabs .active { color: #fff3c4; border-color: #d6a845; background-color: #735b2877; }
@@ -47,17 +48,66 @@
       .clearSearch { width: 18px; margin-left: 6px; color: #cfc5b2; font-size: 14px; text-align: center; cursor: pointer; }
       .clearSearch:hover { color: #fff3c4; }
 
-      .servers { width: 100%; height: 340px; overflow-y: auto; border: 1px; border-color: #80652e; }
-      .server { display: flex; align-items: center; padding: 4px 8px; min-height: 62px; border-bottom: 1px; border-color: #493b20; }
+      .servers { width: 100%; height: 420px; overflow-y: auto; border: 1px; border-color: #80652e; }
+      .server { display: flex; align-items: center; padding: 4px 8px; min-height: 62px; border-bottom: 1px; border-color: #493b20; flex-wrap: wrap; }
       .server-main { flex: 1; min-width: 0; }
       .server.favoriteServer { min-height: 0; padding: 3px 9px; background-color: #16232e; border-left: 3px; border-left-color: #4d7f9c; }
       .server.favoriteServer .description { display: none; }
-      .server.favoriteServer .server-badges { display: none; }
+      /* Favorites keep their badges but pack them two per row so the
+         compact card stays short. All nodes still exist (stable DOM). */
+      .server.favoriteServer .server-badges {
+        width: 60px;
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: center;
+        align-content: center;
+      }
+      .server.favoriteServer .server-badges .tag { font-size: 9px; margin-bottom: 1px; }
+      .server.favoriteServer .server-badges .link-badge { width: auto; }
       .reorder { display: none; }
-      .server.favoriteServer .reorder { display: flex; align-items: center; margin-right: 5px; }
-      .move-favorite { width: 13px; height: 13px; padding: 1px; cursor: pointer; }
-      .move-favorite:hover { background-color: #2d4757; }
-      .move-favorite img { width: 11px; height: 11px; }
+      .move-favorite { display: none; }
+      /* Multi-launch checkbox on each card, left of the favorite star.
+         Green to match the launch-account checkboxes and stay distinct
+         from the gold favorite stars. */
+      .server-heading > .checkbox { cursor: pointer; }
+      .server-heading > .checkbox:hover { border-color: #7fdb88; }
+      .server-heading > .checkbox.checked { background-color: #7fdb88; border-color: #7fdb88; }
+      /* Chevron on favorite rows: click to expand the account picker. */
+      .chevron { width: 15px; height: 15px; padding: 1px; margin-right: 4px; cursor: pointer; }
+      .chevron:hover { background-color: #2d4757; }
+      .chevron img { width: 13px; height: 13px; }
+      /* Alternate-client path row inside the picker; hidden until the
+         "Alternate client" checkbox in the picker header is ticked. */
+      .altPathRow { display: flex; align-items: center; margin-bottom: 4px; }
+      .alternatePath { flex: 1; min-width: 0; margin-right: 5px; }
+      /* Expandable per-server account picker: an indented box on its own row
+         beneath the card. Present in every row (stable DOM), toggled with
+         .hidden. One account per line, alternating row tints for readability. */
+      .picker {
+        width: 100%;
+        margin: 4px 0 2px 0;
+        padding: 4px 6px 6px 24px;
+        background-color: #10141c;
+        border: 1px;
+        border-color: #2a3444;
+        border-radius: 3px;
+      }
+      .picker-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 3px; }
+      .picker-summary { color: #8ec9e8; font-size: 11px; }
+      .picker .pickRow {
+        display: flex;
+        align-items: center;
+        padding: 2px 4px;
+        cursor: pointer;
+      }
+      .picker .pickRow.even { background-color: #141a26; }
+      .picker .pickRow.odd { background-color: #0d1119; }
+      .picker .pickRow:hover { background-color: #241f14; }
+      .pick-label { color: #cfc5b2; font-size: 11px; overflow: hidden; white-space: nowrap; }
+      .picker .checkbox { margin-right: 4px; }
+      .pickStar { width: 17px; height: 16px; margin-right: 4px; cursor: pointer; flex-shrink: 0; }
+      .pickStar img { width: 15px; height: 14px; }
+      .pickRow { cursor: pointer; }
       .server:hover { background-color: #735b2844; }
       .server.selected { background-color: #735b2877; border-left: 3px; border-left-color: #d6a845; }
       .server.filtered { display: none; }
@@ -65,9 +115,9 @@
       .title-block { display: flex; align-items: center; flex: 1; min-width: 180px; }
       .server h3 { color: #efd07d; font-size: 19px; line-height: 21px; margin: 0; }
       .title-block .endpoint { margin-left: 7px; font-size: 11px; white-space: nowrap; }
-      .server-links { display: flex; flex-direction: column; justify-content: center; align-items: center; width: 24px; margin-left: 6px; }
       .description { color: #cfc5b2; margin: 1px 0 0 22px; font-size: 12px; }
-      .server-badges { display: flex; flex-direction: column; width: 72px; margin-left: 8px; }
+      .server-badges { display: flex; flex-direction: column; justify-content: center; align-items: stretch; width: 72px; margin-left: 8px; }
+      .server-badges .link-badge { width: auto; }
       .server-badges .tag { margin-right: 0; margin-bottom: 2px; padding: 1px 4px; text-align: center; font-size: 10px; }
       .tag { display: inline-block; margin-right: 4px; padding: 2px 5px; color: #bdb6a4; background-color: #181611; border: 1px; border-color: #403929; border-radius: 3px; font-size: 11px; }
       .pve { color: #79cfff; }
@@ -92,21 +142,68 @@
       .description { flex: 1; color: #cfc5b2; margin: 0; font-size: 12px; }
       .endpoint { color: #8ec9e8; }
 
-      .launch-panel { min-height: 88px; border-top: 1px; border-color: #80652e; padding-top: 6px; }
-      .account-choices { display: flex; min-height: 24px; overflow-x: auto; margin-bottom: 4px; }
-      .accountChoice.checked { color: #7fdb88; border-color: #7fdb88; }
-      .client-settings { display: flex; margin-bottom: 5px; }
-      .inner .toggle { width: 180px; margin-left: 0; }
-      .toggle.enabled { color: #7fdb88; }
-      .alternatePath { flex: 1; min-width: 0; margin-left: 5px; }
-      /* Flat, but still the primary action: gold edge rather than a skin. */
-      .inner .launch { width: 180px; margin-left: 0; border-color: #80652e; color: #efd07d; font-weight: bold; }
+      .launch-panel { min-height: 52px; border-top: 1px; border-color: #80652e; padding-top: 6px; }
+      .checkbox {
+        display: inline-block;
+        width: 11px;
+        height: 11px;
+        margin-right: 4px;
+        flex-shrink: 0;
+        border: 1px;
+        border-color: #4b422c;
+        background-color: #12100b;
+      }
+      .checkbox.checked { background-color: #7fdb88; border-color: #7fdb88; }
+      .pickRow:hover .checkbox { border-color: #d6a845; }
+      .altToggle:hover .checkbox { border-color: #d6a845; }
+      /* The launch row: one large primary action. */
+      .launch-row { display: flex; align-items: center; margin-bottom: 5px; }
+      .inner .launch { flex: 1; min-width: 0; margin-left: 0; border-color: #80652e; color: #efd07d; font-weight: bold; font-size: 15px; padding: 8px 9px; }
       .launch.disabled { color: #777; border-color: #4a4438; }
+      /* Armed: bright filled red so a valid combo is unmissable. */
+      .inner .launch.ready {
+        border-color: #ff6b6b;
+        color: #fff0f0;
+        background-color: #c01818;
+      }
+      .inner .launch.ready:hover {
+        border-color: #ff9a9a;
+        background-color: #d82828;
+      }
+      /* Not armed: no fill at all — just the outline. Declared after .ready
+         (source order beats same-specificity rules; RmlUi lacks :not()). */
+      .inner .launch.plain {
+        background-color: transparent;
+        color: #cfc5b2;
+        border-color: #4a4438;
+      }
+      .inner .launch.plain:hover {
+        border-color: #d6a845;
+        color: #efd07d;
+      }
+      /* Alt-client toggle button in the picker header. */
+      .inner .altToggle {
+        display: inline-flex;
+        align-items: center;
+        padding: 3px 8px;
+        border: 1px;
+        border-color: #4b422c;
+        background-color: #17150f;
+        color: #cfc5b2;
+        font-size: 11px;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .inner .altToggle:hover { border-color: #d6a845; color: #fff3c4; }
+      .inner .altToggle.checked { color: #7fdb88; border-color: #7fdb88; }
 
-      .account-actions { display: flex; justify-content: flex-end; margin-bottom: 6px; }
+      .account-actions { display: flex; justify-content: center; gap: 8px; margin-bottom: 6px; }
       .accounts-list { height: 170px; overflow-y: auto; border: 1px; border-color: #80652e; }
       .account-row { display: flex; align-items: center; padding: 5px; border-bottom: 1px; border-color: #493b20; }
-      .account-row .accountChoice { width: 130px; text-align: left; }
+      .reorder-account { display: flex; align-items: center; margin-right: 4px; }
+      .move-account { width: 13px; height: 13px; padding: 1px; cursor: pointer; }
+      .move-account:hover { background-color: #2d4757; }
+      .move-account img { width: 11px; height: 11px; }
       .account-name { width: 145px; }
       .account-name h3 { font-size: 14px; }
       .account-server { flex: 1; color: #8ec9e8; }

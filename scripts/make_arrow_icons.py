@@ -16,3 +16,7 @@ def save(name, points):
 
 save("arrow-up", [(5.5, 2), (9.5, 8), (1.5, 8)])
 save("arrow-down", [(5.5, 9), (9.5, 3), (1.5, 3)])
+# Right-pointing chevron for expandable server rows; drawn hollow on the
+# favorites row so it reads as "click to expand" rather than "reorder".
+save("chevron-right", [(4, 2), (8.5, 5.5), (4, 9)])
+save("chevron-down", [(2, 4), (5.5, 8.5), (9, 4)])

@@ -10,7 +10,10 @@ local function loadSettings()
     endpoint = '',
     favorites = {},
     favoriteOrder = {},
-    alternateClients = {}
+    accountOrder = {},
+    alternateClients = {},
+    serverAccounts = {},
+    serverAccountFavorites = {}
   }
   local file = io.open(SETTINGS_FILE, 'r')
   if file ~= nil then
@@ -26,6 +29,14 @@ local function loadSettings()
   result.favorites = result.favorites or {}
   result.favoriteOrder = result.favoriteOrder or {}
   result.alternateClients = result.alternateClients or {}
+  result.serverAccounts = result.serverAccounts or {}
+  result.serverAccountFavorites = result.serverAccountFavorites or {}
+  result.serverLaunchSelected = result.serverLaunchSelected or {}
+  local cleanOrder = {}
+  for _, accountId in ipairs(result.accountOrder or {}) do
+    if type(accountId) == 'string' then cleanOrder[#cleanOrder + 1] = accountId end
+  end
+  result.accountOrder = cleanOrder
   local ranked = {}
   for _, serverId in ipairs(result.favoriteOrder) do ranked[serverId] = true end
   for serverId, isFavorite in pairs(result.favorites) do
@@ -38,13 +49,18 @@ end
 
 local saved = loadSettings()
 local favoriteOrder = saved.favoriteOrder
+local accountOrder = saved.accountOrder
 local savedFavorites = {}
 for _, serverId in ipairs(favoriteOrder) do savedFavorites[serverId] = true end
+local savedServerAccounts = saved.serverAccounts
+local savedServerAccountFavorites = saved.serverAccountFavorites
+local serverLaunchSelected = saved.serverLaunchSelected or {}
 
 -- rx state tables are C#-backed proxies whose raw contents are empty, so json.encode
 -- misreads them as arrays and throws on their string keys. Persist plain copies only.
 local function plainCopy(source)
   local copy = {}
+  if source == nil then return copy end
   for key, value in pairs(source) do
     if type(value) == 'table' then
       local inner = {}
@@ -69,7 +85,10 @@ local state = rx:CreateState({
   endpoint = saved.endpoint,
   favorites = savedFavorites,
   alternateClients = saved.alternateClients,
+  serverAccounts = savedServerAccounts,
+  serverAccountFavorites = savedServerAccountFavorites,
   selectedAccounts = {},
+  expandedServers = {},
   accountId = '',
   accountUsername = '',
   accountAlias = '',
@@ -85,7 +104,11 @@ local function saveSettings()
     clientpath = state.clientpath,
     endpoint = state.endpoint,
     favoriteOrder = favoriteOrder,
-    alternateClients = plainCopy(state.alternateClients)
+    accountOrder = accountOrder,
+    alternateClients = plainCopy(state.alternateClients),
+    serverAccounts = plainCopy(state.serverAccounts or {}),
+    serverAccountFavorites = plainCopy(state.serverAccountFavorites or {}),
+    serverLaunchSelected = plainCopy(serverLaunchSelected or {})
   })
   if not ok then
     state.error = 'Could not save settings: ' .. tostring(encoded)
@@ -150,8 +173,112 @@ local function moveFavorite(serverId, delta)
   bump()
 end
 
-local function toggleAccount(accountId)
-  state.selectedAccounts[accountId] = not state.selectedAccounts[accountId]
+-- Per-server favorite accounts: pinned above the rest of that server's
+-- picker, alphabetical inside the pinned group. Persisted per server.
+local function serverAccountFavorites()
+  -- Nested rx tables read back nil when untouched; guard like serverAccountPicks.
+  local raw = state.serverAccountFavorites
+  if type(raw) ~= 'table' then
+    state.serverAccountFavorites = {}
+    return {}
+  end
+  return raw
+end
+
+local function toggleServerFavorite(serverId, accountId)
+  local favs = plainCopy(serverAccountFavorites())
+  favs[serverId] = favs[serverId] or {}
+  favs[serverId][accountId] = not favs[serverId][accountId] and true or nil
+  state.serverAccountFavorites = favs
+  saveSettings()
+  bump()
+end
+
+local function serverAccountPicks()
+  local raw = state.serverAccounts
+  if type(raw) ~= 'table' then
+    state.serverAccounts = {}
+    return {}
+  end
+  return raw
+end
+
+-- Per-server account picks: which saved accounts launch on which server.
+local function toggleServerAccount(serverId, accountId)
+  local picks = plainCopy(serverAccountPicks())
+  picks[serverId] = picks[serverId] or {}
+  picks[serverId][accountId] = not picks[serverId][accountId] and true or nil
+  state.serverAccounts = picks
+  saveSettings()
+  bump()
+end
+
+-- # on an rx proxy table reads 0 (the same reactive-proxy quirk as the
+-- settings invariant), so all account-count checks go through this.
+local function accountsCount()
+  local count = 0
+  for _ in ipairs(state.accounts) do count = count + 1 end
+  return count
+end
+
+local function toggleAllServerAccounts(serverId)
+  local picks = plainCopy(serverAccountPicks())
+  local current = picks[serverId] or {}
+  local count = 0
+  for _, account in ipairs(state.accounts) do
+    if current[account.Id] then count = count + 1 end
+  end
+  local target = count < accountsCount()
+  local next = {}
+  if target then
+    for _, account in ipairs(state.accounts) do next[account.Id] = true end
+  end
+  picks[serverId] = next
+  state.serverAccounts = picks
+  saveSettings()
+  bump()
+end
+
+local function serverAccountCount(serverId)
+  local count = 0
+  for _, account in ipairs(state.accounts) do
+    if (serverAccountPicks()[serverId] or {})[account.Id] then count = count + 1 end
+  end
+  return count
+end
+
+-- Account order is a permutation: every account keeps its row; only the
+-- sequence changes. Unknown IDs (new accounts) fall through in feed order.
+local function orderedAccounts()
+  local ranked, rankOf = {}, {}
+  for index, accountId in ipairs(accountOrder) do rankOf[accountId] = index end
+  for _, account in ipairs(state.accounts) do
+    local rank = rankOf[account.Id]
+    if rank ~= nil then ranked[#ranked + 1] = { rank = rank, account = account } end
+  end
+  table.sort(ranked, function(left, right) return left.rank < right.rank end)
+  local ordered = {}
+  for _, entry in ipairs(ranked) do ordered[#ordered + 1] = entry.account end
+  for _, account in ipairs(state.accounts) do
+    if rankOf[account.Id] == nil then ordered[#ordered + 1] = account end
+  end
+  return ordered
+end
+
+local function moveAccount(accountId, delta)
+  local rank
+  for index, id in ipairs(accountOrder) do
+    if id == accountId then rank = index; break end
+  end
+  if rank == nil then
+    -- Not yet ranked: append it first so it can be moved relative to the others.
+    accountOrder[#accountOrder + 1] = accountId
+    rank = #accountOrder
+  end
+  local target = rank + delta
+  if target < 1 or target > #accountOrder then return end
+  accountOrder[rank], accountOrder[target] = accountOrder[target], accountOrder[rank]
+  saveSettings()
   bump()
 end
 
@@ -183,6 +310,24 @@ local function setAlternatePath(server, path)
   alternate.path = path
   state.alternateClients[server.Id] = alternate
   saveSettings()
+end
+
+local function setAlternatePathById(serverId, path)
+  local alternate = state.alternateClients[serverId] or { enabled = false, path = '' }
+  alternate.path = path
+  state.alternateClients[serverId] = alternate
+  saveSettings()
+  bump()
+end
+
+local function browseForClientPath(serverId)
+  local ok, result = pcall(function() return plugin:BrowseForExecutable() end)
+  if ok and type(result) == 'string' and #result > 0 then
+    setAlternatePathById(serverId, result)
+  elseif not ok then
+    state.error = tostring(result)
+    bump()
+  end
 end
 
 local function matches(server)
@@ -237,15 +382,135 @@ local function pinnedFirst()
   return ordered
 end
 
+local function AccountPickRow(serverId, account, index)
+  local checked = (serverAccountPicks()[serverId] or {})[account.Id] == true
+  local fav = (serverAccountFavorites()[serverId] or {})[account.Id] == true
+  -- ONE handler on the row. Nested onclicks on the star/checkbox crash the
+  -- RmlUi plugin's instance cache during event dispatch (IndexOutOfRange in
+  -- RmlInstanceCache), so the row inspects e.TargetElement's classes instead:
+  -- clicking the star toggles the pin, anything else toggles the launch pick.
+  return rx:Span('', {
+    class = { pickRow = true, even = index % 2 == 0, odd = index % 2 == 1 },
+    title = 'Click to launch ' .. account.Alias .. ' on this server; click the star to pin it to the top',
+    onclick = function(e)
+      e.StopPropagation()
+      local target = e.TargetElement
+      local isStar = false
+      while target ~= nil do
+        local ok, hasClass = pcall(function() return target:HasClass('pickStar') end)
+        if ok and hasClass then isStar = true; break end
+        -- stop walking at this row
+        local okSelf, isSelf = pcall(function() return target:HasClass('pickRow') end)
+        if okSelf and isSelf then break end
+        local okParent, parent = pcall(function() return target:GetParentNode() end)
+        if not okParent or parent == nil then break end
+        target = parent
+      end
+      if isStar then
+        toggleServerFavorite(serverId, account.Id)
+      else
+        toggleServerAccount(serverId, account.Id)
+      end
+    end
+  }, {
+    rx:Span('', { class = { checkbox = true, checked = checked } }),
+    rx:Span('', {
+      class = { pickStar = true, active = fav },
+      title = fav and 'Unpin from this server' or 'Pin to the top of this server'
+    }, {
+      rx:Img({
+        src = '@plugins/ServerBrowser/assets/'
+          .. (fav and 'star-on.png' or 'star-off.png')
+      })
+    }),
+    rx:Span(account.Alias, { class = 'pick-label' })
+  })
+end
+
+-- The expandable account picker for one server. Part of every row so the
+-- virtual-DOM child tree stays stable; hidden via CSS when collapsed.
+local function ServerAccountPicker(server)
+  local picks = {}
+  local picksCount = serverAccountCount(server.Id)
+  local alternate = state.alternateClients[server.Id] or { enabled = false, path = '' }
+  picks[1] = rx:Div({ class = 'picker-head' }, {
+    rx:Button({
+      onclick = function(e) e.StopPropagation(); toggleAllServerAccounts(server.Id) end
+    }, picksCount == accountsCount() and 'Clear all' or 'Select all'),
+    rx:Button({
+      class = { altToggle = true, checked = alternate.enabled == true },
+      title = 'Use an alternate client executable when launching this server',
+      onclick = function(e)
+        e.StopPropagation()
+        setAlternateEnabled(server, not alternate.enabled)
+      end
+    }, {
+      rx:Span('', { class = { checkbox = true, checked = alternate.enabled == true } }),
+      rx:Span('Alternate Client', { class = 'altToggle-label' })
+    })
+  })
+  -- Alternate-client path row: hidden until the Alternate Client button is
+  -- toggled on. The row always exists (stable DOM); CSS hides it otherwise.
+  picks[2] = rx:Div({ class = { altPathRow = true, hidden = alternate.enabled ~= true } }, {
+    rx:Input({
+      class = 'alternatePath',
+      type = 'text',
+      value = alternate.path or '',
+      placeholder = 'Path to this server\'s client executable...',
+      onclick = function(e) e.StopPropagation() end,
+      onchange = function(e) setAlternatePath(server, e.Params.value) end
+    }),
+    rx:Button({
+      onclick = function(e) e.StopPropagation(); browseForClientPath(server.Id) end
+    }, 'Browse...')
+  })
+  -- Alphabetical: pinned (per-server favorite) accounts first, then the
+  -- rest; each group sorted by alias.
+  local favs = serverAccountFavorites()[server.Id] or {}
+  local pinned, rest = {}, {}
+  for _, account in ipairs(state.accounts) do
+    if favs[account.Id] then pinned[#pinned + 1] = account else rest[#rest + 1] = account end
+  end
+  local byAlias = function(left, right)
+    return string.lower(left.Alias or '') < string.lower(right.Alias or '')
+  end
+  table.sort(pinned, byAlias)
+  table.sort(rest, byAlias)
+  local index = 0
+  for _, account in ipairs(pinned) do
+    index = index + 1
+    picks[#picks + 1] = AccountPickRow(server.Id, account, index)
+  end
+  for _, account in ipairs(rest) do
+    index = index + 1
+    picks[#picks + 1] = AccountPickRow(server.Id, account, index)
+  end
+  return rx:Div({
+    class = { picker = true, hidden = state.expandedServers[server.Id] ~= true }
+  }, picks)
+end
+
+-- Multi-launch selection: checkbox next to the star marks servers for a
+-- combined launch. Persisted so the setup survives restarts.
+-- (serverLaunchSelected itself is declared near the top with the other saved tables.)
+
+local function toggleServerLaunch(serverId)
+  serverLaunchSelected[serverId] = not serverLaunchSelected[serverId] and true or nil
+  saveSettings()
+  bump()
+end
+
 local function ServerRow(server, isFiltered)
   local serverType = string.lower(server.Type or '')
   local status = string.lower(server.Status or '')
   local hasDiscord = #(server.DiscordUrl or '') > 0
   local hasWebsite = #(server.WebsiteUrl or '') > 0
+  local isFavorite = state.favorites[server.Id] == true
+  local launchChecked = serverLaunchSelected[server.Id] == true
   return rx:Div({
     class = {
       server = true,
-      favoriteServer = state.favorites[server.Id] == true,
+      favoriteServer = isFavorite,
       selected = state.selected ~= nil and state.selected.Id == server.Id,
       filtered = isFiltered
     },
@@ -254,27 +519,34 @@ local function ServerRow(server, isFiltered)
     rx:Div({ class = 'server-main' }, {
       rx:Div({ class = 'server-heading' }, {
         rx:Span('', {
-          class = { favorite = true, active = state.favorites[server.Id] == true },
-          title = state.favorites[server.Id] and 'Remove favorite' or 'Add favorite',
+          class = { checkbox = true, checked = launchChecked },
+          title = 'Include this server in a multi-launch',
+          onclick = function(e) e.StopPropagation(); toggleServerLaunch(server.Id) end
+        }),
+        rx:Span('', {
+          class = { favorite = true, active = isFavorite },
+          title = isFavorite and 'Remove favorite' or 'Add favorite',
           onclick = function(e) e.StopPropagation(); toggleFavorite(server.Id) end
         }, {
           rx:Img({
-            src = state.favorites[server.Id]
+            src = isFavorite
               and '@plugins/ServerBrowser/assets/star-on.png'
               or '@plugins/ServerBrowser/assets/star-off.png'
           })
         }),
-        rx:Div({ class = 'reorder' }, {
-          rx:Span('', {
-            class = 'move-favorite',
-            title = 'Move favorite up',
-            onclick = function(e) e.StopPropagation(); moveFavorite(server.Id, -1) end
-          }, { rx:Img({ src = '@plugins/ServerBrowser/assets/arrow-up.png' }) }),
-          rx:Span('', {
-            class = 'move-favorite',
-            title = 'Move favorite down',
-            onclick = function(e) e.StopPropagation(); moveFavorite(server.Id, 1) end
-          }, { rx:Img({ src = '@plugins/ServerBrowser/assets/arrow-down.png' }) })
+        rx:Span('', {
+          class = { chevron = true, hidden = not isFavorite },
+          title = 'Show accounts to launch on this server',
+          onclick = function(e)
+            e.StopPropagation()
+            state.expandedServers[server.Id] = not state.expandedServers[server.Id] and true or nil
+            bump()
+          end
+        }, {
+          rx:Img({
+            src = '@plugins/ServerBrowser/assets/'
+              .. (state.expandedServers[server.Id] == true and 'chevron-down.png' or 'chevron-right.png')
+          })
         }),
         rx:Div({ class = 'title-block' }, {
           rx:H3(server.Name),
@@ -283,7 +555,15 @@ local function ServerRow(server, isFiltered)
       }),
       rx:P(server.Description or '', { class = 'description' })
     }),
-    rx:Div({ class = 'server-links' }, {
+    rx:Div({ class = 'server-badges' }, {
+      rx:Span('', {
+        class = hasDiscord and 'tag link-badge discord-icon' or 'tag link-badge hidden',
+        title = hasDiscord and ('Open ' .. server.Name .. ' Discord') or '',
+        onclick = hasDiscord and function(e)
+          e.StopPropagation()
+          plugin:OpenDiscord(server.DiscordUrl)
+        end or nil
+      }, { rx:Img({ src = '@plugins/ServerBrowser/assets/discord.png' }) }),
       rx:Span('', {
         class = hasWebsite and 'tag link-badge website-link' or 'tag link-badge hidden',
         title = hasWebsite and ('Open ' .. server.Name .. ' website') or '',
@@ -292,16 +572,6 @@ local function ServerRow(server, isFiltered)
           plugin:OpenWebsite(server.WebsiteUrl)
         end or nil
       }, { rx:Img({ src = '@plugins/ServerBrowser/assets/web.png' }) }),
-      rx:Span('', {
-        class = hasDiscord and 'tag link-badge discord-icon' or 'tag link-badge hidden',
-        title = hasDiscord and ('Open ' .. server.Name .. ' Discord') or '',
-        onclick = hasDiscord and function(e)
-          e.StopPropagation()
-          plugin:OpenDiscord(server.DiscordUrl)
-        end or nil
-      }, { rx:Img({ src = '@plugins/ServerBrowser/assets/discord.png' }) })
-    }),
-    rx:Div({ class = 'server-badges' }, {
       rx:Span(server.Emulator or 'Unknown', { class = 'tag emulator' }),
       rx:Span(server.Type or 'Unspecified', {
         class = { tag = true, pve = serverType == 'pve', pvp = serverType == 'pvp' }
@@ -323,7 +593,10 @@ local function ServerRow(server, isFiltered)
           and 'This host name no longer resolves, so the listing looks dead'
           or 'ICMP latency; N/A means the host does not answer pings'
       })
-    })
+    }),
+    -- Picker last so flex-wrap places it on its own full-width line beneath
+    -- the untouched card when expanded.
+    ServerAccountPicker(server)
   })
 end
 
@@ -335,6 +608,22 @@ local function launchAccount(account, server)
   if not ok then state.error = tostring(err); bump() end
 end
 
+-- Multi-launch: every server whose picker has accounts checked launches all
+-- of them. Falls back to the single global selection when no server picker
+-- has any picks.
+local function launchServerPicks()
+  local launched = 0
+  for _, server in ipairs(state.servers) do
+    for _, account in ipairs(state.accounts) do
+      if (serverAccountPicks()[server.Id] or {})[account.Id] then
+        launchAccount(account, server)
+        launched = launched + 1
+      end
+    end
+  end
+  return launched
+end
+
 local function launchCheckedCurrent()
   if state.selected == nil then state.error = 'Select a server first'; bump(); return end
   for _, account in ipairs(state.accounts) do
@@ -342,15 +631,21 @@ local function launchCheckedCurrent()
   end
 end
 
-local function hasSelectedAccounts()
-  for _, account in ipairs(state.accounts) do
-    if state.selectedAccounts[account.Id] then return true end
+local function hasLaunchableSelection()
+  -- Ready = at least one server card is TICKED and that server has picked
+  -- accounts. Mere picks without a tick don't arm the button.
+  for _, server in ipairs(state.servers) do
+    if serverLaunchSelected[server.Id] then
+      for _, account in ipairs(state.accounts) do
+        if (serverAccountPicks()[server.Id] or {})[account.Id] then return true end
+      end
+    end
   end
   return false
 end
 
 local function beginLaunch()
-  if #state.accounts == 0 then
+  if accountsCount() == 0 then
     state.accountId = ''
     state.accountUsername = ''
     state.accountAlias = ''
@@ -361,6 +656,21 @@ local function beginLaunch()
     bump()
     return
   end
+  -- Servers ticked with the card checkbox launch only their checked
+  -- accounts; each ticked server can have a different set.
+  local ticked = 0
+  for _, server in ipairs(state.servers) do
+    if serverLaunchSelected[server.Id] then
+      for _, account in ipairs(state.accounts) do
+        if (serverAccountPicks()[server.Id] or {})[account.Id] then
+          launchAccount(account, server)
+          ticked = ticked + 1
+        end
+      end
+    end
+  end
+  if ticked > 0 then return end
+  if launchServerPicks() > 0 then return end
   launchCheckedCurrent()
 end
 
@@ -403,7 +713,14 @@ end
 
 local function deleteAccount(account)
   local ok, err = pcall(function() plugin:DeleteAccount(account.Id) end)
-  if ok then state.selectedAccounts[account.Id] = nil; loadAccounts()
+  if ok then
+    state.selectedAccounts[account.Id] = nil
+    local rank
+    for index, id in ipairs(accountOrder) do
+      if id == account.Id then rank = index; break end
+    end
+    if rank ~= nil then table.remove(accountOrder, rank); saveSettings() end
+    loadAccounts()
   else state.error = tostring(err); bump() end
 end
 
@@ -422,41 +739,32 @@ local function importAccounts()
   bump()
 end
 
-local function AccountChoice(account)
-  return rx:Button({
-    class = { accountChoice = true, checked = state.selectedAccounts[account.Id] == true },
-    onclick = function() toggleAccount(account.Id) end
-  }, (state.selectedAccounts[account.Id] and '[x] ' or '[ ] ') .. account.Alias)
+local function importThwarg()
+  local ok, result = pcall(function() return plugin:ImportThwargLauncher() end)
+  if ok then
+    loadAccounts()
+    state.error = tostring(result)
+  else
+    state.error = tostring(result)
+  end
+  bump()
 end
 
 local function ServerLaunchPanel()
   local server = state.selected
   local hasServer = server ~= nil
-  local alternate = hasServer and (state.alternateClients[server.Id] or { enabled = false, path = '' }) or { enabled = false, path = '' }
-  local choices = {}
-  for _, account in ipairs(state.accounts) do choices[#choices + 1] = AccountChoice(account) end
-  local canLaunch = hasServer and hasSelectedAccounts()
+  local canLaunch = hasServer and hasLaunchableSelection()
 
+  -- Account picks live in each server card's expandable picker now, so this
+  -- panel is just the primary action.
   return rx:Div({ class = 'launch-panel' }, {
-    rx:Div({ class = 'account-choices' }, choices),
-    rx:Div({ class = 'client-settings' }, {
+    rx:Div({ class = 'launch-row' }, {
       rx:Button({
-        class = { toggle = true, enabled = alternate.enabled == true },
-        onclick = function() if hasServer then setAlternateEnabled(server, not alternate.enabled) end end
-      }, alternate.enabled and 'Use alternate client: ON' or 'Use alternate client: OFF'),
-      rx:Input({
-        class = { alternatePath = true, hidden = not alternate.enabled },
-        type = 'text',
-        value = alternate.path or '',
-        placeholder = 'Alternate client executable for this server...',
-        onchange = function(e) if hasServer then setAlternatePath(server, e.Params.value) end end
-      })
-    }),
-    rx:Button({
-      class = { launch = true, disabled = not canLaunch },
-      disabled = not canLaunch and #state.accounts > 0,
-      onclick = beginLaunch
-    }, 'Launch')
+        class = { launch = true, disabled = not canLaunch, ready = canLaunch, plain = not canLaunch },
+        disabled = not canLaunch and accountsCount() > 0,
+        onclick = beginLaunch
+      }, 'Launch')
+    })
   })
 end
 
@@ -487,7 +795,18 @@ end
 local function AccountRow(account)
   local defaultServer = findServer(account.DefaultServerId)
   return rx:Div({ class = 'account-row' }, {
-    AccountChoice(account),
+    rx:Div({ class = 'reorder-account' }, {
+      rx:Span('', {
+        class = 'move-account',
+        title = 'Move account up',
+        onclick = function(e) e.StopPropagation(); moveAccount(account.Id, -1) end
+      }, { rx:Img({ src = '@plugins/ServerBrowser/assets/arrow-up.png' }) }),
+      rx:Span('', {
+        class = 'move-account',
+        title = 'Move account down',
+        onclick = function(e) e.StopPropagation(); moveAccount(account.Id, 1) end
+      }, { rx:Img({ src = '@plugins/ServerBrowser/assets/arrow-down.png' }) })
+    }),
     rx:Div({ class = 'account-name' }, {
       rx:H3(account.Alias),
       rx:Span(account.Username, { class = 'muted' })
@@ -502,10 +821,10 @@ end
 
 local function AccountsView()
   local rows = {}
-  for _, account in ipairs(state.accounts) do rows[#rows + 1] = AccountRow(account) end
+  for _, account in ipairs(orderedAccounts()) do rows[#rows + 1] = AccountRow(account) end
   if #rows == 0 then rows[1] = rx:Div('No saved accounts yet.', { class = 'muted empty' }) end
   return rx:Div({ class = { tabView = true, hidden = state.activeTab ~= 'accounts' } }, {
-    rx:Div({ class = { ['account-actions'] = true, hidden = #state.accounts == 0 } }, {
+    rx:Div({ class = { ['account-actions'] = true, hidden = accountsCount() == 0 } }, {
       rx:Button({ onclick = launchCheckedDefaults }, 'Launch defaults'),
       rx:Button({ onclick = launchCheckedCurrent }, 'Launch selected')
     }),
@@ -526,10 +845,13 @@ local function AccountsView()
     }),
     rx:Div({ class = 'settings' }, {
       rx:H3('Client and encrypted credential backup'),
+      rx:Div({ class = 'form-row' }, {
+        rx:Button({ onclick = importThwarg }, 'Import from ThwargLauncher')
+      }),
       rx:Div({ class = 'field' }, { rx:Label('Default client path'), rx:Input({ type = 'text', value = state.clientpath, onchange = function(e) state.clientpath = e.Params.value; saveSettings() end }) }),
       rx:Div({ class = 'form-row' }, {
         rx:Div({ class = 'field' }, { rx:Label('Backup file'), rx:Input({ type = 'text', value = state.backupPath, onchange = function(e) state.backupPath = e.Params.value end }) }),
-        rx:Div({ class = 'field' }, { rx:Label('Backup passphrase (12+ characters)'), rx:Input({ type = 'password', value = state.backupPassword, onchange = function(e) state.backupPassword = e.Params.value end }) }),
+        rx:Div({ class = 'field' }, { rx:Label('Backup passphrase'), rx:Input({ type = 'password', value = state.backupPassword, onchange = function(e) state.backupPassword = e.Params.value end }) }),
         rx:Button({ onclick = exportAccounts }, 'Export'),
         rx:Button({ onclick = importAccounts }, 'Import')
       })

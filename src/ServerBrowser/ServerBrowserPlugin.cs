@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Chorizite.Core.Backend.Launcher;
 using Chorizite.Core.Plugins;
@@ -87,6 +88,40 @@ public sealed class ServerBrowserPlugin : IPluginCore {
         return RequireAccounts().GetAccounts();
     }
 
+    public string ImportThwargLauncher() {
+        var accounts = RequireAccounts();
+        var roaming = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        var thwargHome = Path.Combine(roaming, "ThwargLauncher");
+        var accountsTxt = Path.Combine(thwargHome, "Accounts.txt");
+        if (!File.Exists(accountsTxt)) {
+            throw new FileNotFoundException("ThwargLauncher Accounts.txt was not found in %APPDATA%\\ThwargLauncher");
+        }
+
+        var profile = Directory.GetFiles(Path.Combine(thwargHome, "Profiles"), "*.txt")
+            .OrderBy(File.GetLastWriteTimeUtc).LastOrDefault();
+        var defaults = profile is null ? null : ThwargLauncherParser.ParseProfileDefaults(profile);
+        var importer = new ThwargLauncherImporter(accounts);
+
+        // Match Thwarg server names against the cached feed by endpoint, then by name.
+        var servers = ThwargLauncherParser.ParseUserServerList(Path.Combine(thwargHome, "Servers", "UserServerList.xml"));
+        var cachedServers = _feedClient?.RefreshAsync().GetAwaiter().GetResult() ?? [];
+        string? ResolveServerId(string serverName) {
+            foreach (var thwarg in servers) {
+                if (!thwarg.Name.Equals(serverName, StringComparison.OrdinalIgnoreCase)) continue;
+                var endpoint = $"{thwarg.Host}:{thwarg.Port}";
+                var match = cachedServers.Find(s => s.Endpoint.Equals(endpoint, StringComparison.OrdinalIgnoreCase));
+                return match?.Id;
+            }
+            // Fall back to a direct feed-name match.
+            var byName = cachedServers.Find(s => s.Name.Equals(serverName, StringComparison.OrdinalIgnoreCase));
+            return byName?.Id;
+        }
+
+        var (imported, updated) = importer.Import(accountsTxt, defaults, ResolveServerId);
+        _log.LogInformation("ThwargLauncher import: {Imported} new, {Updated} updated", imported, updated);
+        return $"Imported {imported} and updated {updated} accounts from ThwargLauncher";
+    }
+
     public void OpenDiscord(string url) {
         if (!DiscordLink.TryOpen(url, out var error)) {
             _log.LogWarning("Unable to open Discord link {DiscordUrl}: {Error}", url, error);
@@ -96,6 +131,20 @@ public sealed class ServerBrowserPlugin : IPluginCore {
     public void OpenWebsite(string url) {
         if (!WebsiteLink.TryOpen(url, out var error)) {
             _log.LogWarning("Unable to open website link {WebsiteUrl}: {Error}", url, error);
+        }
+    }
+
+    /// <summary>Opens a native file picker and returns the chosen .exe path, or null when cancelled or unavailable.</summary>
+    public string? BrowseForExecutable() {
+        FileDialog.Log = m => _log.LogInformation("{Message}", m);
+        try {
+            var path = FileDialog.PickExecutable();
+            _log.LogInformation("BrowseForExecutable returned {Result}", path ?? "(cancelled/unavailable)");
+            return path;
+        }
+        catch (Exception ex) {
+            _log.LogError(ex, "BrowseForExecutable failed");
+            throw;
         }
     }
 

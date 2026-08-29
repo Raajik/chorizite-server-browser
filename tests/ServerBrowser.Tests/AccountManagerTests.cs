@@ -61,6 +61,37 @@ public class AccountManagerTests : IDisposable {
         Assert.Equal("backup secret", restoredSecrets.Read("account-1"));
     }
 
+    [Theory]
+    [InlineData("x")]
+    [InlineData("abc")]
+    [InlineData(" short but valid ")]
+    public void ShortNonEmptyPassphraseCanExportAndImport(string passphrase) {
+        var sourceSecrets = new MemorySecretStore();
+        var source = new AccountManager(Path.Combine(_directory, "short-source"), sourceSecrets);
+        source.Save("account-s", "raajik", "Main", "coldeve", "short passphrase secret");
+        var backupPath = Path.Combine(_directory, "short.csb-backup");
+
+        source.ExportBackup(backupPath, passphrase);
+
+        var restoredSecrets = new MemorySecretStore();
+        var restored = new AccountManager(Path.Combine(_directory, "short-restored"), restoredSecrets);
+        restored.ImportBackup(backupPath, passphrase);
+        var account = Assert.Single(restored.GetAccounts());
+        Assert.Equal("account-s", account.Id);
+        Assert.Equal("short passphrase secret", restoredSecrets.Read("account-s"));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void EmptyOrWhitespacePassphraseIsRejected(string passphrase) {
+        var source = new AccountManager(Path.Combine(_directory, "reject"), new MemorySecretStore());
+        var backupPath = Path.Combine(_directory, "reject.csb-backup");
+
+        Assert.ThrowsAny<ArgumentException>(() => source.ExportBackup(backupPath, passphrase));
+        Assert.ThrowsAny<ArgumentException>(() => source.ImportBackup(backupPath, passphrase));
+    }
+
     public void Dispose() {
         if (Directory.Exists(_directory)) Directory.Delete(_directory, recursive: true);
     }

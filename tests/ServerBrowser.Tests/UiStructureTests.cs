@@ -79,8 +79,40 @@ public class UiStructureTests {
         var lua = ReadLua();
         var rml = ReadRml();
 
-        Assert.Contains("favoriteServer = state.favorites[server.Id] == true", lua);
+        Assert.Contains("favoriteServer = isFavorite", lua);
         Assert.Matches(@"\.server\.favoriteServer \{[^}]*background-color", rml);
+        // Reordering is NOT drag-and-drop (distorted ghost); order comes from
+        // the Accounts tab arrows.
+        Assert.DoesNotContain("onDragstart", lua);
+        Assert.DoesNotContain("drag: clone", rml);
+        Assert.DoesNotContain("moveFavorite(server.Id", lua);
+        Assert.DoesNotContain("move-favorite", lua);
+    }
+
+    [Fact]
+    public void ServerRowsHaveAnExpandablePerServerAccountPicker() {
+        var lua = ReadLua();
+        var rml = ReadRml();
+
+        // Chevron implies expand/collapse; the picker is a stable child of every
+        // row (hidden with .hidden), never added or removed.
+        Assert.Contains("chevron-right.png", lua);
+        Assert.Contains("chevron-down.png", lua);
+        Assert.Contains("expandedServers[server.Id]", lua);
+        Assert.Contains("class = { picker = true, hidden = state.expandedServers[server.Id] ~= true }", lua);
+        Assert.Contains("toggleServerAccount(serverId, account.Id)", lua);
+        Assert.Contains("'Select all'", lua);
+        Assert.Contains("state.serverAccounts", lua);
+        Assert.Matches(@"\.picker \{[^}]*width: 100%", rml);
+        // Alternating row tints inside the picker box.
+        Assert.Contains(".picker .pickRow.even { background-color:", rml);
+        Assert.Contains(".picker .pickRow.odd { background-color:", rml);
+        // Picks launch through the normal account-launch path.
+        Assert.Contains("launchServerPicks()", lua);
+        // Per-server favorite stars pin accounts to the top of that picker.
+        Assert.Contains("toggleServerFavorite(serverId, account.Id)", lua);
+        Assert.Contains("star-on.png", lua);
+        Assert.Matches(@"\.pickStar \{[^}]*cursor: pointer", rml);
     }
 
     [Fact]
@@ -99,9 +131,10 @@ public class UiStructureTests {
         Assert.Contains("local function pinnedFirst()", lua);
         Assert.Contains("for _, server in ipairs(pinnedFirst()) do", lua);
         Assert.Contains("for serverId, isFavorite in pairs(result.favorites) do", lua);
-        Assert.Contains("moveFavorite(server.Id, -1)", lua);
-        Assert.Contains("moveFavorite(server.Id, 1)", lua);
+        // Order persists as a rank array; reorder happens through the Accounts
+        // tab arrows (moveAccount), not drag & drop.
         Assert.Contains("favoriteOrder = favoriteOrder", lua);
+        Assert.Contains("moveAccount(account.Id, -1)", lua);
         Assert.DoesNotContain("table.sort(state.servers", lua);
     }
 
@@ -121,10 +154,26 @@ public class UiStructureTests {
         var rml = ReadRml();
 
         Assert.Contains(".server.favoriteServer .description { display: none; }", rml);
-        Assert.Contains(".server.favoriteServer .server-badges { display: none; }", rml);
+        // Badges stay visible on favorites, packed two per row, instead of being hidden.
+        Assert.Matches(@"\.server\.favoriteServer \.server-badges \{[^}]*flex-wrap: wrap", rml);
+        Assert.DoesNotContain(".server.favoriteServer .server-badges { display: none; }", rml);
         Assert.Contains(".reorder { display: none; }", rml);
-        Assert.Contains(".server.favoriteServer .reorder { display: flex;", rml);
         Assert.Matches(@"\.server\.favoriteServer \{[^}]*min-height: 0", rml);
+    }
+
+    [Fact]
+    public void AccountsOfferSelectAllAndManualReordering() {
+        var lua = ReadLua();
+        var rml = ReadRml();
+
+        // Per-server pickers have their own Select all; reorder lives on the Accounts tab.
+        Assert.Contains("'Select all'", lua);
+        // Reordering is a persisted permutation, like favorites: one row per account.
+        Assert.Contains("local function orderedAccounts()", lua);
+        Assert.Contains("moveAccount(account.Id, -1)", lua);
+        Assert.Contains("moveAccount(account.Id, 1)", lua);
+        Assert.Contains("accountOrder = accountOrder", lua);
+        Assert.Contains(".move-account {", rml);
     }
 
     [Fact]
@@ -144,12 +193,36 @@ public class UiStructureTests {
     [Fact]
     public void ServerRowsSupportFavoritesAndPerServerClientOverrides() {
         var lua = ReadLua();
+        var rml = ReadRml();
 
         Assert.Contains("toggleFavorite(server.Id)", lua);
         Assert.Contains("star-on.png", lua);
         Assert.Contains("star-off.png", lua);
         Assert.Contains("alternateClients[server.Id]", lua);
-        Assert.Contains("Use alternate client", lua);
+        Assert.Contains("'Alternate Client'", lua);
+        // Per-server multi-launch checkbox precedes the favorite star.
+        Assert.Contains("toggleServerLaunch(server.Id)", lua);
+        Assert.Contains("serverLaunchSelected[server.Id]", lua);
+        Assert.Contains("server-heading > .checkbox.checked { background-color: #7fdb88", rml);
+    }
+
+    [Fact]
+    public void AlternateClientSetupLivesInTheServerPickerWithBrowseDialog() {
+        var lua = ReadLua();
+        var rml = ReadRml();
+
+        // The picker header holds Select all (left) and the Alternate client
+        // checkbox (right); the path row appears only when checked.
+        Assert.Contains("'Alternate Client'", lua);
+        Assert.Contains("altPathRow = true, hidden = alternate.enabled ~= true", lua);
+        Assert.Contains("class = 'alternatePath'", lua);
+        Assert.Contains("plugin:BrowseForExecutable()", lua);
+        Assert.Contains("'Browse...'", lua);
+        Assert.Matches(@"\.altToggle \{[^}]*cursor: pointer", rml);
+        Assert.Matches(@"\.altPathRow \{[^}]*display: flex", rml);
+        // No separate tab anymore.
+        Assert.DoesNotContain("activeTab = 'clients'", lua);
+        Assert.DoesNotContain("AlternateClientsView", lua);
     }
 
     [Fact]
@@ -208,18 +281,25 @@ public class UiStructureTests {
     }
 
     [Fact]
-    public void WebAndDiscordRenderAsMatchingIconsBesideTheBadgeColumn() {
+    public void LinkIconsLiveAtTheTopOfTheBadgeColumnWithDiscordFirst() {
         var lua = ReadLua();
         var rml = ReadRml();
 
-        Assert.Contains("class = 'server-links'", lua);
-        Assert.Contains(".server-links { display: flex; flex-direction: column; justify-content: center;", rml);
-
-        Assert.True(lua.IndexOf("class = 'server-links'", StringComparison.Ordinal) >
-                    lua.IndexOf("class = 'description'", StringComparison.Ordinal),
-            "links belong outside the text column, between it and the badges");
-        Assert.True(lua.IndexOf("class = 'server-badges'", StringComparison.Ordinal) >
-                    lua.IndexOf("class = 'server-links'", StringComparison.Ordinal));
+        // The separate .server-links column is gone; both icons fold into
+        // .server-badges so positions stay consistent regardless of which
+        // servers have a Discord. The stable virtual-DOM invariant holds:
+        // one node per row per icon, always present, toggled via .hidden.
+        Assert.DoesNotContain("server-links", lua);
+        Assert.DoesNotContain(".server-links", rml);
+        // Discord is the first child of the badge column, ahead of emulator/type/status.
+        var luaNorm = lua.Replace("\r", "");
+        int discordIcon = luaNorm.IndexOf("'tag link-badge discord-icon'", StringComparison.Ordinal);
+        int webIcon = luaNorm.IndexOf("'tag link-badge website-link'", StringComparison.Ordinal);
+        int badges = luaNorm.IndexOf("class = 'server-badges'", StringComparison.Ordinal);
+        int emulator = luaNorm.IndexOf("'tag emulator'", StringComparison.Ordinal);
+        Assert.True(badges < discordIcon && discordIcon < webIcon && webIcon < emulator,
+            "badge column order must be Discord, website, then emulator/type/status");
+        Assert.Contains("'tag link-badge hidden'", lua);
         Assert.Contains("assets/web.png", lua);
         Assert.Contains("assets/discord.png", lua);
         Assert.Contains("'tag link-badge website-link'", lua);
@@ -234,14 +314,16 @@ public class UiStructureTests {
 
         // theme.rcss skins button at (0,0,1); .inner scoping is what outranks it.
         Assert.Matches(@"\.inner button \{[^}]*decorator: none", rml);
-        Assert.Contains(".toolbar input, .field input, .alternatePath {", rml);
+        // theme.rcss sets click-sound: 0x0A0003B3 on every button; scope a silent
+        // override so Server Browser buttons stay quiet without touching the theme.
+        Assert.Matches(@"\.inner button \{[^}]*click-sound: none", rml);
+        Assert.Contains(".toolbar input, .field input {", rml);
         Assert.Contains(".inner button:hover", rml);
         Assert.Contains(".inner button[disabled]", rml);
 
         // Colour overrides must outrank .inner button, so they carry .inner too.
         Assert.Contains(".inner .danger", rml);
         Assert.Contains(".inner .launch", rml);
-        Assert.Contains(".inner .toggle", rml);
         Assert.DoesNotMatch(@"(?m)^\s*button \{", rml);
     }
 
@@ -253,6 +335,16 @@ public class UiStructureTests {
         var tag = rml.IndexOf(".tag { display: inline-block", StringComparison.Ordinal);
 
         Assert.True(hidden > tag, ".hidden must come after .tag or hidden badges still render");
+    }
+
+    [Fact]
+    public void AccountsTabOffersThwargLauncherImport() {
+        var lua = ReadLua();
+
+        Assert.Contains("'Import from ThwargLauncher'", lua);
+        Assert.Contains("plugin:ImportThwargLauncher()", lua);
+        // Result runs inside pcall so a missing Thwarg install shows an error, never a crash.
+        Assert.Matches(@"local function importThwarg\(\)[\s\S]*?pcall\([\s\S]*?bump\(\)", lua);
     }
 
     [Fact]
