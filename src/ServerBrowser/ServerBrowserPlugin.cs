@@ -44,6 +44,7 @@ public sealed class ServerBrowserPlugin : IPluginCore {
         }
 
         _accounts = new AccountManager(DataDirectory, secrets);
+        if (!_accounts.AccountsFileExists) _accounts.SeedExamples();
         _feedClient = new ServerFeedClient(Path.Combine(DataDirectory, "cache"));
         _panel = _rmlUi.CreatePanel("Server Browser", Path.Combine(AssemblyDirectory, "assets", "server-browser.rml"));
         if (_panel is null) {

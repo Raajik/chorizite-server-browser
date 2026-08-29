@@ -95,7 +95,6 @@ local state = rx:CreateState({
   accountUsername = '',
   accountAlias = '',
   accountPassword = '',
-  accountDefaultServerId = '',
   backupPath = plugin.DataDirectory .. '/accounts.csb-backup',
   backupPassword = '',
   removeMode = false,
@@ -659,7 +658,6 @@ local function beginLaunch()
     state.accountUsername = ''
     state.accountAlias = ''
     state.accountPassword = ''
-    state.accountDefaultServerId = state.selected ~= nil and state.selected.Id or ''
     state.activeTab = 'accounts'
     state.addAccountOpen = true
     state.error = ''
@@ -680,17 +678,7 @@ local function beginLaunch()
     end
   end
   if ticked > 0 then return end
-  if launchServerPicks() > 0 then return end
-  if accountsCount() > 0 and state.selected ~= nil then
-    -- No picks anywhere: launch the account whose default server matches the
-    -- selected server (single-account convenience only).
-    for _, account in ipairs(state.accounts) do
-      if account.DefaultServerId == state.selected.Id then
-        launchAccount(account, state.selected)
-        return
-      end
-    end
-  end
+  launchServerPicks()
 end
 
 local function editAccount(account)
@@ -698,7 +686,6 @@ local function editAccount(account)
   state.accountUsername = account.Username
   state.accountAlias = account.Alias
   state.accountPassword = ''
-  state.accountDefaultServerId = account.DefaultServerId or ''
   state.addAccountOpen = true
   bump()
 end
@@ -708,18 +695,15 @@ local function clearAccountForm()
   state.accountUsername = ''
   state.accountAlias = ''
   state.accountPassword = ''
-  state.accountDefaultServerId = state.selected ~= nil and state.selected.Id or ''
 end
 
 local function saveAccount()
-  local defaultId = state.accountDefaultServerId
-  if #defaultId == 0 and state.selected ~= nil then defaultId = state.selected.Id end
   local ok, result = pcall(function()
     return plugin:SaveAccount(
       state.accountId,
       state.accountUsername,
       state.accountAlias,
-      defaultId,
+      '',
       state.accountPassword)
   end)
   if ok then clearAccountForm(); loadAccounts() else state.error = tostring(result); bump() end
@@ -832,7 +816,7 @@ local function AccountRow(account, index)
       title = 'Click to edit this account',
       onclick = function() editAccount(account) end
     }, {
-      rx:H3(account.Alias),
+      rx:Span(account.Alias, { class = 'account-alias' }),
       rx:Span(account.Username, { class = 'muted' })
     }),
     rx:Span(launchLabel(account), { class = 'account-log' }),
@@ -890,8 +874,6 @@ local function AccountsView()
         rx:Div({ class = 'field' }, { rx:Label(#state.accountId > 0 and 'New password (blank keeps current)' or 'Password'), rx:Input({ type = 'password', value = state.accountPassword, onchange = function(e) state.accountPassword = e.Params.value end }) })
       }),
       rx:Div({ class = 'form-row' }, {
-        rx:Span('Default server: ' .. (findServer(state.accountDefaultServerId) ~= nil and findServer(state.accountDefaultServerId).Name or 'none'), { class = 'default-server' }),
-        rx:Button({ onclick = function() if state.selected ~= nil then state.accountDefaultServerId = state.selected.Id; bump() end end }, 'Use selected server'),
         rx:Button({ onclick = function() saveAccount(); state.addAccountOpen = false; bump() end }, 'Save account'),
         rx:Button({ onclick = function() clearAccountForm(); state.addAccountOpen = false; bump() end }, 'Cancel')
       })

@@ -199,17 +199,18 @@
 
       .account-actions { display: flex; justify-content: center; gap: 8px; margin-bottom: 6px; }
       .accounts-list { height: 260px; overflow-y: auto; border: 1px; border-color: #80652e; }
-      .account-row { display: flex; align-items: center; padding: 5px 7px; border-bottom: 1px; border-color: #493b20; }
+      .account-row { display: flex; align-items: center; padding: 2px 7px; min-height: 24px; border-bottom: 1px; border-color: #493b20; }
       .account-row.even { background-color: #12100c; }
       .reorder-account { display: flex; align-items: center; margin-right: 4px; }
       .move-account { width: 13px; height: 13px; padding: 1px; cursor: pointer; }
       .move-account:hover { background-color: #2d4757; }
       .move-account img { width: 11px; height: 11px; }
-      /* The account's name block: big alias, muted username beneath, clickable
-         to edit. Takes all the width the old button row used to eat. */
-      .account-main { flex: 1; min-width: 0; cursor: pointer; }
-      .account-main:hover h3 { color: #fff3c4; }
-      .account-main h3 { font-size: 16px; }
+      /* Single-line account row, sized like the servers page: bold alias,
+         muted username after it, clickable to edit. */
+      .account-main { flex: 1; min-width: 0; cursor: pointer; display: flex; align-items: baseline; }
+      .account-main:hover .account-alias { color: #fff3c4; }
+      .account-alias { font-weight: bold; font-size: 14px; line-height: 18px; margin-right: 7px; color: #efd07d; }
+      .account-main .muted { font-size: 11px; }
       .account-log { width: 250px; margin-right: 6px; color: #8d877a; font-size: 11px; text-align: right; white-space: nowrap; overflow: hidden; }
       .inner .danger { color: #ff8787; }
       .inner .danger:hover { border-color: #ff8787; color: #ffb3b3; }

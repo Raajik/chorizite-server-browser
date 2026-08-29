@@ -389,8 +389,27 @@ public class UiStructureTests {
         Assert.DoesNotContain("Launch checked accounts", lua);
     }
 
+    [Fact]
+    public void FirstRunSeedsExampleAccounts() {
+        var cs = ReadCSharp("Accounts", "AccountManager.cs");
+        var plugin = ReadCSharp("ServerBrowserPlugin.cs");
+
+        // Seed happens once, only when accounts.json doesn't exist yet.
+        Assert.Contains("if (!_accounts.AccountsFileExists) _accounts.SeedExamples();", plugin);
+        Assert.Matches(@"SeedExamples\(\)[\s\S]*?Alias = ""Main""", cs);
+        Assert.Matches(@"SeedExamples\(\)[\s\S]*?Alias = ""Mule/Buffbot""", cs);
+        Assert.Matches(@"SeedExamples\(\)[\s\S]*?Username = ""Account1""", cs);
+        // Examples carry no password: launching one surfaces the "no saved password" error.
+        Assert.Matches(@"SeedExamples\(\)[\s\S]*?DefaultServerId = """"", cs);
+    }
+
     private static string ReadLua() =>
         File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "assets", "server-browser.lua"));
+
+    private static string ReadCSharp(params string[] parts) =>
+        File.ReadAllText(Path.GetFullPath(Path.Combine(
+            new[] { AppContext.BaseDirectory, "..", "..", "..", "..", "..", "src", "ServerBrowser" }
+                .Concat(parts).ToArray())));
 
     private static string ReadRml() =>
         File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "assets", "server-browser.rml"));

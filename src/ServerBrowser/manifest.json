@@ -3,7 +3,7 @@
   "name": "Community Server Browser",
   "author": "Raajik",
   "entryfile": "ServerBrowser.dll",
-  "version": "0.10.7",
+  "version": "0.10.8",
   "description": "Browse the AC community server list and launch directly from Chorizite.",
   "repo": "https://github.com/Raajik/chorizite-server-browser",
   "dependencies": [

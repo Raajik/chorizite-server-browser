@@ -13,7 +13,7 @@ This is a **standalone Chorizite launcher plugin**. It is intentionally separate
 
 ## Current version and status
 
-Current plugin version: **0.10.7**
+Current plugin version: **0.10.8**
 
 Verified on Windows 11 with:
 
@@ -25,9 +25,9 @@ Verified on Windows 11 with:
 
 Last verification:
 
-- 70/70 tests passing
+- 71/71 tests passing
 - build succeeds with 0 warnings and 0 errors
-- Chorizite discovers `Community Server Browser (0.10.7)`
+- Chorizite discovers `Community Server Browser (0.10.8)`
 - panel renders and live community data loads
 - TreeStats counts merge and sort correctly
 - passwords are absent from plugin JSON and persisted only in Windows Credential Manager
@@ -432,6 +432,13 @@ The repository was clean at tag `v0.8.0` / commit `d24a997`. **All four items be
 - **Last-launch log**: `lastLaunches[accountId] = {when, serverName}` written in `launchAccount` on success, persisted in settings.json (must be seeded in BOTH loadSettings and saveSettings, per the 0.10.4 lesson — it is). Shown as "Last launch: <date> · <server>" / "Never launched" per row; cleared on account delete. No decal plugin involved — launch-time only, no character names.
 - **Alternating account-row tints via `.even` class**, NOT `:nth-child` (unsupported, same family as `:not()`).
 - Coverage: `AccountsTabHeaderButtonsRevealSectionsAndDeleteIsDeliberate`; list height 170→260px in tests.
+
+**0.10.8 — Accounts tab decoupled from servers (2026-08-29):**
+
+- **Accounts tab no longer touches servers**: `accountDefaultServerId` state, the "Default server" form row, and "Use selected server" are gone; `saveAccount` always passes `''` for DefaultServerId (SaveAccount signature unchanged). `beginLaunch` fallback is now just `launchServerPicks()`.
+- **Compact single-line account rows** sized like the servers page: bold gold `.account-alias` span + muted username inline (replaced the stacked H3), `min-height: 24px`.
+- **First-run examples**: `AccountManager.SeedExamples()` writes Account1/"Main" + Account2/"Mule/Buffbot" (no passwords) when accounts.json doesn't exist; `ServerBrowserPlugin.Initialize` seeds once. Launching an example surfaces the "no saved password" error, which teaches the flow.
+- Test path gotcha: test bin is `tests/ServerBrowser.Tests/bin/Debug/net8.0` — that's **five** `..` hops to repo root, not four; use `Path.GetFullPath`.
 
 ## Pending user request at the previous handoff
 

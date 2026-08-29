@@ -24,6 +24,22 @@ public sealed class AccountManager {
             _jsonOptions) ?? [];
     }
 
+    /// <summary>True until the first launch ever writes accounts.json.</summary>
+    public bool AccountsFileExists => File.Exists(_accountsPath);
+
+    /// <summary>
+    /// First-run examples (Main / Mule-Buffbot) so the Accounts tab is never a
+    /// blank wall. Written without passwords: launching one shows the
+    /// "no saved password" error, which demonstrates that accounts need one.
+    /// </summary>
+    public void SeedExamples() {
+        var examples = new List<SavedAccount> {
+            new() { Id = Guid.NewGuid().ToString("N"), Username = "Account1", Alias = "Main", DefaultServerId = "" },
+            new() { Id = Guid.NewGuid().ToString("N"), Username = "Account2", Alias = "Mule/Buffbot", DefaultServerId = "" }
+        };
+        File.WriteAllText(_accountsPath, JsonSerializer.Serialize(examples, _jsonOptions));
+    }
+
     public SavedAccount Save(
         string id,
         string username,
