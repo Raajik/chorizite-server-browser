@@ -4,8 +4,9 @@
     <script src="server-browser.lua"></script>
     <style>
       * { box-sizing: border-box; }
-      body { width: 780px; margin: 0 auto; font-family: Tahoma; color: #eee; }
-      .inner { background-color: #080808; padding: 8px; }
+      body { width: 780px; height: 630px; margin: 0 auto; font-family: Tahoma; color: #eee; }
+      .inner { background-color: #080808; padding: 8px; height: 100%; display: flex; flex-direction: column; }
+      .tabView { flex: 1; min-height: 0; display: flex; flex-direction: column; }
       h2 { color: #d6a845; margin: 1px 0 5px 0; font-size: 20px; text-align: center; }
       h3 { color: #efd07d; margin: 0; }
       /* Flat controls. theme.rcss skins every button with a ninepatch decorator at
@@ -204,12 +205,14 @@
       .account-row { display: flex; align-items: center; padding: 2px 7px; min-height: 24px; border-bottom: 1px; border-color: #493b20; }
       .account-row.even { background-color: #12100c; }
       .reorder-account { display: none; }
-      /* Single-line account row, sized like the servers page: bold alias,
-         muted username after it, clickable to edit. */
+      /* Single-line account row: username first and large (the primary
+         identity), alias/description after it. Clickable to edit. */
       .account-main { flex: 1; min-width: 0; cursor: pointer; display: flex; align-items: baseline; }
-      .account-main:hover .account-alias { color: #fff3c4; }
-      .account-alias { font-weight: bold; font-size: 14px; line-height: 18px; margin-right: 7px; color: #7fdb88; }
-      .account-main .muted { font-size: 11px; }
+      .account-main:hover .account-username { color: #fff3c4; }
+      .account-username { font-weight: bold; font-size: 14px; line-height: 18px; margin-right: 7px; color: #efd07d; }
+      .account-alias { font-weight: bold; font-size: 14px; line-height: 18px; color: #7fdb88; }
+      /* Description mode: small grey, like a note rather than a name. */
+      .account-alias.alias-description { font-weight: normal; font-size: 11px; color: #8d877a; }
       .account-log { width: 250px; margin-right: 6px; color: #8d877a; font-size: 11px; text-align: right; white-space: nowrap; overflow: hidden; }
       /* Bottom action card: overlaps the last rows of the account list. */
       .bottom-card {
@@ -234,12 +237,16 @@
       .field { flex: 1; min-width: 0; margin-right: 5px; }
       .field label { display: block; color: #d6a845; font-size: 12px; }
       /* Form labels that mirror the account-row text style they produce. */
+      .field-label-username-primary { display: block; color: #efd07d; font-weight: bold; font-size: 14px; }
       .field-label-alias { display: block; color: #7fdb88; font-weight: bold; font-size: 14px; }
       .field-label-username { display: block; color: #8d877a; font-size: 11px; }
       .field-label { display: block; color: #d6a845; font-size: 12px; }
+      /* Large field: the primary input gets the extra width. */
+      .field-lg { flex: 2.2; }
 
       /* Last so it beats same-specificity display rules such as .tag. */
       .hidden { display: none; }
+      .tabView.hidden { display: none; }
       .field input { width: 100%; }
       .default-server { flex: 1; color: #8ec9e8; }
       .muted { color: #8d877a; }

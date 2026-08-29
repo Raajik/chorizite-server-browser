@@ -13,7 +13,7 @@ This is a **standalone Chorizite launcher plugin**. It is intentionally separate
 
 ## Current version and status
 
-Current plugin version: **0.10.9**
+Current plugin version: **0.10.10**
 
 Verified on Windows 11 with:
 
@@ -27,7 +27,7 @@ Last verification:
 
 - 73/73 tests passing
 - build succeeds with 0 warnings and 0 errors
-- Chorizite discovers `Community Server Browser (0.10.9)`
+- Chorizite discovers `Community Server Browser (0.10.10)`
 - panel renders and live community data loads
 - TreeStats counts merge and sort correctly
 - passwords are absent from plugin JSON and persisted only in Windows Credential Manager
@@ -447,6 +447,13 @@ The repository was clean at tag `v0.8.0` / commit `d24a997`. **All four items be
 - **Overlapping bottom cards**: Add/Edit, Remove, and Backup each open as an absolutely-positioned `.bottom-card` pinned to the bottom of `.accounts-wrap`, covering the last rows. Exactly one open at a time (`accountsCard()` derives from `removeMode`/`showBackup`/`addAccountOpen`); clicking the same button again closes it (`closeAccountsCard`). Clicking an account name opens the add card in edit mode.
 - **Alias color coding**: aliases render green (`#7fdb88`, bold 14px); the form's Alias label mirrors that style (`.field-label-alias`), Username label is small grey (`.field-label-username`) — the label visually maps onto the row text it produces.
 - Coverage: `AccountsAreSortedAlphabeticallyWithoutManualReordering`, `AccountsTabBottomButtonsOpenOverlappingCards`, `AccountAliasColorGuidesTheFormFields`.
+
+**0.10.10 — Username-first rows, Alias/Description toggle, full-height tab (2026-08-29):**
+
+- **Username is the primary identity**: row renders Username first (bold gold 14px), alias/description after it. Form field order matches (Username top, `field-lg` at flex 2.2).
+- **Alias ↔ Description toggle** in the add/edit card (altToggle pattern). Description mode renders the value small grey (`.account-alias.alias-description`, 11px normal weight); mode inferred per row by `#alias > 20`. Aliases equal to the username are hidden from the row (no duplication).
+- **Full-height tab layout**: `body` gets `height: 630px`, `.inner` and `.tabView` are flex columns, so the accounts list stretches to the bottom action bar — no dead space. `.servers` tab keeps its fixed 420px list.
+- **RCSS gotcha**: the new `.tabView.hidden` rule tripped `HiddenRuleIsDeclaredLastSoItBeatsTagDisplay` (test finds the FIRST `.hidden { display: none; }`-ish rule vs `.tag`); all `display: none` rules must live in the bottom block.
 
 ## Pending user request at the previous handoff
 

@@ -95,6 +95,7 @@ local state = rx:CreateState({
   accountUsername = '',
   accountAlias = '',
   accountPassword = '',
+  accountDescription = false,
   backupPath = plugin.DataDirectory .. '/accounts.csb-backup',
   backupPassword = '',
   removeMode = false,
@@ -662,6 +663,7 @@ local function editAccount(account)
   state.accountUsername = account.Username
   state.accountAlias = account.Alias
   state.accountPassword = ''
+  state.accountDescription = #(account.Alias or '') > 20
   state.addAccountOpen = true
   bump()
 end
@@ -773,15 +775,19 @@ local function launchLabel(account)
 end
 
 local function AccountRow(account, index)
+  -- Alias mode: green bold nickname. Description mode: small grey text.
+  local isDescription = #(account.Alias or '') > 20
   return rx:Div({ class = { ['account-row'] = true, even = index % 2 == 0 } }, {
-    -- Click the name to edit.
+    -- Username is the primary identity: first, large.
     rx:Div({
       class = 'account-main',
       title = 'Click to edit this account',
       onclick = function() editAccount(account) end
     }, {
-      rx:Span(account.Alias, { class = 'account-alias' }),
-      rx:Span(account.Username, { class = 'muted' })
+      rx:Span(account.Username, { class = 'account-username' }),
+      rx:Span(account.Alias ~= account.Username and account.Alias or '', {
+        class = { ['account-alias'] = true, ['alias-description'] = isDescription }
+      })
     }),
     rx:Span(launchLabel(account), { class = 'account-log' }),
     rx:Button({
@@ -826,16 +832,38 @@ local function AccountsView()
       }, {
         rx:H3(#state.accountId > 0 and 'Edit account' or 'Add account'),
         rx:Div({ class = 'form-row' }, {
-          -- Label styling mirrors the row text it produces: 'Alias' in the
-          -- alias color/size, 'Username' in small grey with the live-typed
-          -- value shown after it so the mapping is unmistakable.
-          rx:Div({ class = 'field' }, {
-            rx:Span('Alias', { class = 'field-label-alias' }),
-            rx:Input({ type = 'text', value = state.accountAlias, onchange = function(e) state.accountAlias = e.Params.value end })
-          }),
-          rx:Div({ class = 'field' }, {
-            rx:Span('Username', { class = 'field-label-username' }),
+          -- Username first (the primary field, largest label). The second
+          -- field toggles between Alias (nickname) and Description, and its
+          -- label mirrors how the value will render in the row.
+          rx:Div({ class = 'field field-lg' }, {
+            rx:Span('Username', { class = 'field-label-username-primary' }),
             rx:Input({ type = 'text', value = state.accountUsername, onchange = function(e) state.accountUsername = e.Params.value end })
+          })
+        }),
+        rx:Div({ class = 'form-row' }, {
+          rx:Div({ class = { field = true, ['field-lg'] = not state.accountDescription } }, {
+            rx:Span(
+              state.accountDescription and 'Description' or 'Alias',
+              { class = state.accountDescription and 'field-label-username' or 'field-label-alias' }
+            ),
+            rx:Input({
+              type = 'text',
+              value = state.accountAlias,
+              placeholder = state.accountDescription and 'What is this account for?' or 'Nickname shown on buttons',
+              onchange = function(e) state.accountAlias = e.Params.value end
+            })
+          }),
+          rx:Button({
+            class = { altToggle = true, checked = state.accountDescription == true },
+            title = 'Switch between a short nickname and a longer description for this account',
+            onclick = function(e)
+              e.StopPropagation()
+              state.accountDescription = not state.accountDescription and true or false
+              bump()
+            end
+          }, {
+            rx:Span('', { class = { checkbox = true, checked = state.accountDescription == true } }),
+            rx:Span('Description', { class = 'altToggle-label' })
           }),
           rx:Div({ class = 'field' }, {
             rx:Span(#state.accountId > 0 and 'New password (blank keeps current)' or 'Password', { class = 'field-label' }),

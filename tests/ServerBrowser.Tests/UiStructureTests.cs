@@ -273,11 +273,19 @@ public class UiStructureTests {
 
         // Aliases render in their own color; the form labels mirror it so the
         // field maps visually onto the row text.
-        Assert.Contains("class = 'account-alias'", lua);
-        Assert.Contains(".account-alias {", rml);
-        Assert.Matches(@"\.account-alias \{[^}]*color", rml);
+        Assert.Contains("class = 'account-username'", lua);
+        Assert.Contains(".account-username {", rml);
+        Assert.Matches(@"\.account-username \{[^}]*color", rml);
         Assert.Contains(".field-label-alias", rml);
         Assert.Contains(".field-label-username", rml);
+        // Username/alias order swapped: username leads the row.
+        var usernamePos = lua.IndexOf("rx:Span(account.Username, { class = 'account-username' }", StringComparison.Ordinal);
+        var aliasPos = lua.IndexOf("rx:Span(account.Alias ~= account.Username and account.Alias or ''", StringComparison.Ordinal);
+        Assert.True(usernamePos >= 0 && usernamePos < aliasPos, "username must precede alias in the account row");
+        // Description mode: small grey variant for long aliases.
+        Assert.Contains("alias-description", lua);
+        Assert.Contains(".account-alias.alias-description", rml);
+        Assert.Contains("'Description'", lua);
     }
 
     [Fact]
