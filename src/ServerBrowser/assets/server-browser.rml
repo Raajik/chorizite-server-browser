@@ -197,21 +197,32 @@
       .inner .altToggle:hover { border-color: #d6a845; color: #fff3c4; }
       .inner .altToggle.checked { color: #7fdb88; border-color: #7fdb88; }
 
-      .account-actions { display: flex; justify-content: center; gap: 8px; margin-bottom: 6px; }
-      .accounts-list { height: 260px; overflow-y: auto; border: 1px; border-color: #80652e; }
+      .account-actions { display: flex; justify-content: center; gap: 8px; margin-top: 6px; }
+      /* The list fills the tab; the open bottom card overlaps its last rows. */
+      .accounts-wrap { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
+      .accounts-list { flex: 1; min-height: 260px; overflow-y: auto; border: 1px; border-color: #80652e; }
       .account-row { display: flex; align-items: center; padding: 2px 7px; min-height: 24px; border-bottom: 1px; border-color: #493b20; }
       .account-row.even { background-color: #12100c; }
-      .reorder-account { display: flex; align-items: center; margin-right: 4px; }
-      .move-account { width: 13px; height: 13px; padding: 1px; cursor: pointer; }
-      .move-account:hover { background-color: #2d4757; }
-      .move-account img { width: 11px; height: 11px; }
+      .reorder-account { display: none; }
       /* Single-line account row, sized like the servers page: bold alias,
          muted username after it, clickable to edit. */
       .account-main { flex: 1; min-width: 0; cursor: pointer; display: flex; align-items: baseline; }
       .account-main:hover .account-alias { color: #fff3c4; }
-      .account-alias { font-weight: bold; font-size: 14px; line-height: 18px; margin-right: 7px; color: #efd07d; }
+      .account-alias { font-weight: bold; font-size: 14px; line-height: 18px; margin-right: 7px; color: #7fdb88; }
       .account-main .muted { font-size: 11px; }
       .account-log { width: 250px; margin-right: 6px; color: #8d877a; font-size: 11px; text-align: right; white-space: nowrap; overflow: hidden; }
+      /* Bottom action card: overlaps the last rows of the account list. */
+      .bottom-card {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #080808;
+        border: 1px;
+        border-color: #80652e;
+        border-radius: 3px;
+        padding: 8px;
+      }
       .inner .danger { color: #ff8787; }
       .inner .danger:hover { border-color: #ff8787; color: #ffb3b3; }
       /* A header button whose section is open gets a lit border. */
@@ -222,6 +233,10 @@
       .form-row { display: flex; align-items: flex-end; margin-bottom: 5px; }
       .field { flex: 1; min-width: 0; margin-right: 5px; }
       .field label { display: block; color: #d6a845; font-size: 12px; }
+      /* Form labels that mirror the account-row text style they produce. */
+      .field-label-alias { display: block; color: #7fdb88; font-weight: bold; font-size: 14px; }
+      .field-label-username { display: block; color: #8d877a; font-size: 11px; }
+      .field-label { display: block; color: #d6a845; font-size: 12px; }
 
       /* Last so it beats same-specificity display rules such as .tag. */
       .hidden { display: none; }

@@ -252,39 +252,15 @@ local function serverAccountCount(serverId)
   return count
 end
 
--- Account order is a permutation: every account keeps its row; only the
--- sequence changes. Unknown IDs (new accounts) fall through in feed order.
+-- Accounts are sorted alphabetically by alias (case-insensitive); accountOrder
+-- from earlier versions is no longer used for display.
 local function orderedAccounts()
-  local ranked, rankOf = {}, {}
-  for index, accountId in ipairs(accountOrder) do rankOf[accountId] = index end
-  for _, account in ipairs(state.accounts) do
-    local rank = rankOf[account.Id]
-    if rank ~= nil then ranked[#ranked + 1] = { rank = rank, account = account } end
-  end
-  table.sort(ranked, function(left, right) return left.rank < right.rank end)
-  local ordered = {}
-  for _, entry in ipairs(ranked) do ordered[#ordered + 1] = entry.account end
-  for _, account in ipairs(state.accounts) do
-    if rankOf[account.Id] == nil then ordered[#ordered + 1] = account end
-  end
-  return ordered
-end
-
-local function moveAccount(accountId, delta)
-  local rank
-  for index, id in ipairs(accountOrder) do
-    if id == accountId then rank = index; break end
-  end
-  if rank == nil then
-    -- Not yet ranked: append it first so it can be moved relative to the others.
-    accountOrder[#accountOrder + 1] = accountId
-    rank = #accountOrder
-  end
-  local target = rank + delta
-  if target < 1 or target > #accountOrder then return end
-  accountOrder[rank], accountOrder[target] = accountOrder[target], accountOrder[rank]
-  saveSettings()
-  bump()
+  local sorted = {}
+  for _, account in ipairs(state.accounts) do sorted[#sorted + 1] = account end
+  table.sort(sorted, function(left, right)
+    return string.lower(left.Alias or '') < string.lower(right.Alias or '')
+  end)
+  return sorted
 end
 
 local function findServer(serverId)
@@ -798,18 +774,6 @@ end
 
 local function AccountRow(account, index)
   return rx:Div({ class = { ['account-row'] = true, even = index % 2 == 0 } }, {
-    rx:Div({ class = { ['reorder-account'] = true, hidden = state.removeMode ~= true } }, {
-      rx:Span('', {
-        class = 'move-account',
-        title = 'Move account up',
-        onclick = function(e) e.StopPropagation(); moveAccount(account.Id, -1) end
-      }, { rx:Img({ src = '@plugins/ServerBrowser/assets/arrow-up.png' }) }),
-      rx:Span('', {
-        class = 'move-account',
-        title = 'Move account down',
-        onclick = function(e) e.StopPropagation(); moveAccount(account.Id, 1) end
-      }, { rx:Img({ src = '@plugins/ServerBrowser/assets/arrow-down.png' }) })
-    }),
     -- Click the name to edit.
     rx:Div({
       class = 'account-main',
@@ -828,69 +792,131 @@ local function AccountRow(account, index)
   })
 end
 
+-- Which bottom card is open: 'none', 'add', 'remove', or 'backup'. Exactly one
+-- at a time; clicking the same button again closes it. Clicking a name to edit
+-- also opens the 'add' card (it doubles as the edit form).
+local function accountsCard()
+  if state.removeMode then return 'remove' end
+  if state.showBackup then return 'backup' end
+  if state.addAccountOpen then return 'add' end
+  return 'none'
+end
+
+local function closeAccountsCard()
+  state.removeMode = false
+  state.showBackup = false
+  state.addAccountOpen = false
+end
+
 local function AccountsView()
   local rows = {}
   for index, account in ipairs(orderedAccounts()) do rows[#rows + 1] = AccountRow(account, index) end
   if #rows == 0 then rows[1] = rx:Div('No saved accounts yet.', { class = 'muted empty' }) end
+  local card = accountsCard()
   return rx:Div({ class = { tabView = true, hidden = state.activeTab ~= 'accounts' } }, {
+    -- Full-height list; the bottom card overlaps its last rows.
+    rx:Div({ class = 'accounts-wrap' }, {
+      rx:Div({ class = 'accounts-list' }, rows),
+      -- Add/edit card: opened by Add Account or by clicking an account name.
+      rx:Div({
+        class = {
+          ['bottom-card'] = true,
+          hidden = card ~= 'add'
+        }
+      }, {
+        rx:H3(#state.accountId > 0 and 'Edit account' or 'Add account'),
+        rx:Div({ class = 'form-row' }, {
+          -- Label styling mirrors the row text it produces: 'Alias' in the
+          -- alias color/size, 'Username' in small grey with the live-typed
+          -- value shown after it so the mapping is unmistakable.
+          rx:Div({ class = 'field' }, {
+            rx:Span('Alias', { class = 'field-label-alias' }),
+            rx:Input({ type = 'text', value = state.accountAlias, onchange = function(e) state.accountAlias = e.Params.value end })
+          }),
+          rx:Div({ class = 'field' }, {
+            rx:Span('Username', { class = 'field-label-username' }),
+            rx:Input({ type = 'text', value = state.accountUsername, onchange = function(e) state.accountUsername = e.Params.value end })
+          }),
+          rx:Div({ class = 'field' }, {
+            rx:Span(#state.accountId > 0 and 'New password (blank keeps current)' or 'Password', { class = 'field-label' }),
+            rx:Input({ type = 'password', value = state.accountPassword, onchange = function(e) state.accountPassword = e.Params.value end })
+          })
+        }),
+        rx:Div({ class = 'form-row' }, {
+          rx:Button({ onclick = function() saveAccount(); closeAccountsCard(); bump() end }, 'Save account'),
+          rx:Button({ onclick = function() clearAccountForm(); closeAccountsCard(); bump() end }, 'Cancel')
+        })
+      }),
+      -- Remove card: instructions + per-row Delete buttons are already visible
+      -- while remove mode is on.
+      rx:Div({
+        class = {
+          ['bottom-card'] = true,
+          hidden = card ~= 'remove'
+        }
+      }, {
+        rx:H3('Remove accounts'),
+        rx:Div('Delete buttons are shown on each account row. Click the button again to go back.', { class = 'muted' }),
+        rx:Div({ class = 'form-row' }, {
+          rx:Button({
+            onclick = function() closeAccountsCard(); bump() end
+          }, 'Done Removing')
+        })
+      }),
+      -- Backup card: client path + encrypted credential backup/import.
+      rx:Div({
+        class = {
+          ['bottom-card'] = true,
+          hidden = card ~= 'backup'
+        }
+      }, {
+        rx:H3('Client and encrypted credential backup'),
+        rx:Div({ class = 'form-row' }, {
+          rx:Button({ onclick = importThwarg }, 'Import from ThwargLauncher')
+        }),
+        rx:Div({ class = 'field' }, { rx:Label('Default client path'), rx:Input({ type = 'text', value = state.clientpath, onchange = function(e) state.clientpath = e.Params.value; saveSettings() end }) }),
+        rx:Div({ class = 'form-row' }, {
+          rx:Div({ class = 'field' }, { rx:Label('Backup file'), rx:Input({ type = 'text', value = state.backupPath, onchange = function(e) state.backupPath = e.Params.value end }) }),
+          rx:Div({ class = 'field' }, { rx:Label('Backup passphrase'), rx:Input({ type = 'password', value = state.backupPassword, onchange = function(e) state.backupPassword = e.Params.value end }) }),
+          rx:Button({ onclick = exportAccounts }, 'Export'),
+          rx:Button({ onclick = importAccounts }, 'Import')
+        })
+      })
+    }),
+    -- Action bar pinned at the very bottom, below the list.
     rx:Div({ class = 'account-actions' }, {
       rx:Button({
-        class = { ['actions-active'] = #state.accountId > 0 },
+        class = { ['actions-active'] = card == 'add' },
         onclick = function()
-          clearAccountForm()
-          state.addAccountOpen = true
+          if card == 'add' then
+            clearAccountForm()
+            closeAccountsCard()
+          else
+            clearAccountForm()
+            closeAccountsCard()
+            state.addAccountOpen = true
+          end
           bump()
         end
       }, 'Add Account'),
       rx:Button({
-        class = { ['actions-active'] = state.removeMode == true },
+        class = { ['actions-active'] = card == 'remove' },
         onclick = function()
-          state.removeMode = not state.removeMode and true or false
+          local wasRemove = state.removeMode
+          closeAccountsCard()
+          if not wasRemove then state.removeMode = true end
           bump()
         end
-      }, state.removeMode and 'Done Removing' or 'Remove Account'),
+      }, 'Remove Account'),
       rx:Button({
-        class = { ['actions-active'] = state.showBackup == true },
+        class = { ['actions-active'] = card == 'backup' },
         onclick = function()
-          state.showBackup = not state.showBackup and true or false
+          local wasBackup = state.showBackup
+          closeAccountsCard()
+          if not wasBackup then state.showBackup = true end
           bump()
         end
       }, 'Backup')
-    }),
-    rx:Div({ class = 'accounts-list' }, rows),
-    -- Add/edit form: hidden until Add Account (or a click on an account name)
-    -- brings it up. Clicking a name enters edit mode via editAccount; the
-    -- form header reflects which mode it's in.
-    rx:Div({
-      class = {
-        ['account-form'] = true,
-        hidden = #state.accountId == 0 and state.addAccountOpen ~= true
-      }
-    }, {
-      rx:H3(#state.accountId > 0 and 'Edit account' or 'Add account'),
-      rx:Div({ class = 'form-row' }, {
-        rx:Div({ class = 'field' }, { rx:Label('Alias'), rx:Input({ type = 'text', value = state.accountAlias, onchange = function(e) state.accountAlias = e.Params.value end }) }),
-        rx:Div({ class = 'field' }, { rx:Label('Username'), rx:Input({ type = 'text', value = state.accountUsername, onchange = function(e) state.accountUsername = e.Params.value end }) }),
-        rx:Div({ class = 'field' }, { rx:Label(#state.accountId > 0 and 'New password (blank keeps current)' or 'Password'), rx:Input({ type = 'password', value = state.accountPassword, onchange = function(e) state.accountPassword = e.Params.value end }) })
-      }),
-      rx:Div({ class = 'form-row' }, {
-        rx:Button({ onclick = function() saveAccount(); state.addAccountOpen = false; bump() end }, 'Save account'),
-        rx:Button({ onclick = function() clearAccountForm(); state.addAccountOpen = false; bump() end }, 'Cancel')
-      })
-    }),
-    -- Backup section: hidden until the Backup button reveals it.
-    rx:Div({ class = { settings = true, hidden = state.showBackup ~= true } }, {
-      rx:H3('Client and encrypted credential backup'),
-      rx:Div({ class = 'form-row' }, {
-        rx:Button({ onclick = importThwarg }, 'Import from ThwargLauncher')
-      }),
-      rx:Div({ class = 'field' }, { rx:Label('Default client path'), rx:Input({ type = 'text', value = state.clientpath, onchange = function(e) state.clientpath = e.Params.value; saveSettings() end }) }),
-      rx:Div({ class = 'form-row' }, {
-        rx:Div({ class = 'field' }, { rx:Label('Backup file'), rx:Input({ type = 'text', value = state.backupPath, onchange = function(e) state.backupPath = e.Params.value end }) }),
-        rx:Div({ class = 'field' }, { rx:Label('Backup passphrase'), rx:Input({ type = 'password', value = state.backupPassword, onchange = function(e) state.backupPassword = e.Params.value end }) }),
-        rx:Button({ onclick = exportAccounts }, 'Export'),
-        rx:Button({ onclick = importAccounts }, 'Import')
-      })
     })
   })
 end

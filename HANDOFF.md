@@ -13,7 +13,7 @@ This is a **standalone Chorizite launcher plugin**. It is intentionally separate
 
 ## Current version and status
 
-Current plugin version: **0.10.8**
+Current plugin version: **0.10.9**
 
 Verified on Windows 11 with:
 
@@ -25,9 +25,9 @@ Verified on Windows 11 with:
 
 Last verification:
 
-- 71/71 tests passing
+- 73/73 tests passing
 - build succeeds with 0 warnings and 0 errors
-- Chorizite discovers `Community Server Browser (0.10.8)`
+- Chorizite discovers `Community Server Browser (0.10.9)`
 - panel renders and live community data loads
 - TreeStats counts merge and sort correctly
 - passwords are absent from plugin JSON and persisted only in Windows Credential Manager
@@ -439,6 +439,14 @@ The repository was clean at tag `v0.8.0` / commit `d24a997`. **All four items be
 - **Compact single-line account rows** sized like the servers page: bold gold `.account-alias` span + muted username inline (replaced the stacked H3), `min-height: 24px`.
 - **First-run examples**: `AccountManager.SeedExamples()` writes Account1/"Main" + Account2/"Mule/Buffbot" (no passwords) when accounts.json doesn't exist; `ServerBrowserPlugin.Initialize` seeds once. Launching an example surfaces the "no saved password" error, which teaches the flow.
 - Test path gotcha: test bin is `tests/ServerBrowser.Tests/bin/Debug/net8.0` — that's **five** `..` hops to repo root, not four; use `Path.GetFullPath`.
+
+**0.10.9 — Accounts tab layout: bottom cards + alphabetical sort (2026-08-29):**
+
+- **Alphabetical sorting**: `orderedAccounts()` sorts by case-insensitive alias. `moveAccount`, `accountOrder` display use, and the arrow controls are gone (reorder was only needed because order was manual).
+- **Buttons moved to the very bottom**, below the list; list (`flex: 1` inside `.accounts-wrap`) stretches to fill the tab.
+- **Overlapping bottom cards**: Add/Edit, Remove, and Backup each open as an absolutely-positioned `.bottom-card` pinned to the bottom of `.accounts-wrap`, covering the last rows. Exactly one open at a time (`accountsCard()` derives from `removeMode`/`showBackup`/`addAccountOpen`); clicking the same button again closes it (`closeAccountsCard`). Clicking an account name opens the add card in edit mode.
+- **Alias color coding**: aliases render green (`#7fdb88`, bold 14px); the form's Alias label mirrors that style (`.field-label-alias`), Username label is small grey (`.field-label-username`) — the label visually maps onto the row text it produces.
+- Coverage: `AccountsAreSortedAlphabeticallyWithoutManualReordering`, `AccountsTabBottomButtonsOpenOverlappingCards`, `AccountAliasColorGuidesTheFormFields`.
 
 ## Pending user request at the previous handoff
 

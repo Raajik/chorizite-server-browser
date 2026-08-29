@@ -134,7 +134,6 @@ public class UiStructureTests {
         // Order persists as a rank array; reorder happens through the Accounts
         // tab arrows (moveAccount), not drag & drop.
         Assert.Contains("favoriteOrder = favoriteOrder", lua);
-        Assert.Contains("moveAccount(account.Id, -1)", lua);
         Assert.DoesNotContain("table.sort(state.servers", lua);
     }
 
@@ -162,18 +161,16 @@ public class UiStructureTests {
     }
 
     [Fact]
-    public void AccountsOfferSelectAllAndManualReordering() {
+    public void AccountsAreSortedAlphabeticallyWithoutManualReordering() {
         var lua = ReadLua();
         var rml = ReadRml();
 
-        // Per-server pickers have their own Select all; reorder lives on the Accounts tab.
-        Assert.Contains("'Select all'", lua);
-        // Reordering is a persisted permutation, like favorites: one row per account.
+        // Accounts sort by alias (case-insensitive); the old arrow-based
+        // reorder is gone since order is no longer manual.
         Assert.Contains("local function orderedAccounts()", lua);
-        Assert.Contains("moveAccount(account.Id, -1)", lua);
-        Assert.Contains("moveAccount(account.Id, 1)", lua);
-        Assert.Contains("accountOrder = accountOrder", lua);
-        Assert.Contains(".move-account {", rml);
+        Assert.Contains("string.lower(left.Alias or '') < string.lower(right.Alias or '')", lua);
+        Assert.DoesNotContain("moveAccount", lua);
+        Assert.DoesNotContain(".move-account {", rml);
     }
 
     [Fact]
@@ -243,17 +240,52 @@ public class UiStructureTests {
         var rml = ReadRml();
 
         Assert.Contains("body { width: 780px", rml);
-        Assert.Contains(".accounts-list { height: 260px", rml);
+        Assert.Contains(".accounts-list { flex: 1", rml);
         Assert.DoesNotContain("Launch checked on selected server", lua);
         Assert.DoesNotContain("Launch checked defaults", lua);
     }
 
     [Fact]
-    public void AccountsTabHeaderButtonsRevealSectionsAndDeleteIsDeliberate() {
+    public void AccountsTabBottomButtonsOpenOverlappingCards() {
         var lua = ReadLua();
         var rml = ReadRml();
 
-        // Dead global launch buttons are gone; three header buttons remain.
+        // Buttons live at the very bottom, below the list.
+        var listPos = lua.IndexOf("'accounts-wrap'", StringComparison.Ordinal);
+        var actionsPos = lua.IndexOf("class = 'account-actions'", StringComparison.Ordinal);
+        Assert.True(listPos >= 0 && listPos < actionsPos, "account list must precede the action bar");
+        // Exactly one card open at a time; re-click closes it.
+        Assert.Contains("local function accountsCard()", lua);
+        Assert.Contains("local function closeAccountsCard()", lua);
+        Assert.Contains("hidden = card ~= 'add'", lua);
+        Assert.Contains("hidden = card ~= 'remove'", lua);
+        Assert.Contains("hidden = card ~= 'backup'", lua);
+        // Cards overlap the list's bottom rows.
+        Assert.Contains(".bottom-card {", rml);
+        Assert.Matches(@"\.bottom-card \{[^}]*position: absolute", rml);
+        Assert.Matches(@"\.accounts-wrap \{[^}]*position: relative", rml);
+    }
+
+    [Fact]
+    public void AccountAliasColorGuidesTheFormFields() {
+        var lua = ReadLua();
+        var rml = ReadRml();
+
+        // Aliases render in their own color; the form labels mirror it so the
+        // field maps visually onto the row text.
+        Assert.Contains("class = 'account-alias'", lua);
+        Assert.Contains(".account-alias {", rml);
+        Assert.Matches(@"\.account-alias \{[^}]*color", rml);
+        Assert.Contains(".field-label-alias", rml);
+        Assert.Contains(".field-label-username", rml);
+    }
+
+    [Fact]
+    public void AccountsTabBottomButtonsRevealSectionsAndDeleteIsDeliberate() {
+        var lua = ReadLua();
+        var rml = ReadRml();
+
+        // Dead global launch buttons are gone; three bottom buttons remain.
         Assert.DoesNotContain("'Launch defaults'", lua);
         Assert.DoesNotContain("'Launch selected'", lua);
         Assert.DoesNotContain("launchCheckedDefaults", lua);
@@ -263,9 +295,9 @@ public class UiStructureTests {
         Assert.Contains("'Remove Account'", lua);
         Assert.Contains("'Backup'", lua);
 
-        // Add form and backup section exist in the DOM always, revealed via .hidden.
-        Assert.Contains("hidden = #state.accountId == 0 and state.addAccountOpen ~= true", lua);
-        Assert.Contains("hidden = state.showBackup ~= true", lua);
+        // Cards exist in the DOM always, revealed via .hidden.
+        Assert.Contains("hidden = card ~= 'add'", lua);
+        Assert.Contains("hidden = card ~= 'backup'", lua);
         // Delete buttons only render in remove mode.
         Assert.Contains("hidden = state.removeMode ~= true", lua);
         Assert.Contains("'Done Removing'", lua);
