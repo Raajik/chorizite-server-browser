@@ -243,9 +243,39 @@ public class UiStructureTests {
         var rml = ReadRml();
 
         Assert.Contains("body { width: 780px", rml);
-        Assert.Contains(".accounts-list { height: 170px", rml);
+        Assert.Contains(".accounts-list { height: 260px", rml);
         Assert.DoesNotContain("Launch checked on selected server", lua);
         Assert.DoesNotContain("Launch checked defaults", lua);
+    }
+
+    [Fact]
+    public void AccountsTabHeaderButtonsRevealSectionsAndDeleteIsDeliberate() {
+        var lua = ReadLua();
+        var rml = ReadRml();
+
+        // Dead global launch buttons are gone; three header buttons remain.
+        Assert.DoesNotContain("'Launch defaults'", lua);
+        Assert.DoesNotContain("'Launch selected'", lua);
+        Assert.DoesNotContain("launchCheckedDefaults", lua);
+        Assert.DoesNotContain("launchCheckedCurrent", lua);
+        Assert.DoesNotContain("selectedAccounts", lua);
+        Assert.Contains("'Add Account'", lua);
+        Assert.Contains("'Remove Account'", lua);
+        Assert.Contains("'Backup'", lua);
+
+        // Add form and backup section exist in the DOM always, revealed via .hidden.
+        Assert.Contains("hidden = #state.accountId == 0 and state.addAccountOpen ~= true", lua);
+        Assert.Contains("hidden = state.showBackup ~= true", lua);
+        // Delete buttons only render in remove mode.
+        Assert.Contains("hidden = state.removeMode ~= true", lua);
+        Assert.Contains("'Done Removing'", lua);
+        // Alternating row tints via a class, not the unsupported :nth-child.
+        Assert.DoesNotContain("nth-child", rml);
+        Assert.Contains(".account-row.even", rml);
+        // Last-launch log on every row.
+        Assert.Contains("lastLaunches", lua);
+        Assert.Contains("'Never launched'", lua);
+        Assert.Contains(".account-log", rml);
     }
 
     [Fact]

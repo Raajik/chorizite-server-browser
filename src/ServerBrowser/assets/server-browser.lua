@@ -13,7 +13,8 @@ local function loadSettings()
     accountOrder = {},
     alternateClients = {},
     serverAccounts = {},
-    serverAccountFavorites = {}
+    serverAccountFavorites = {},
+    lastLaunches = {}
   }
   local file = io.open(SETTINGS_FILE, 'r')
   if file ~= nil then
@@ -32,6 +33,7 @@ local function loadSettings()
   result.serverAccounts = result.serverAccounts or {}
   result.serverAccountFavorites = result.serverAccountFavorites or {}
   result.serverLaunchSelected = result.serverLaunchSelected or {}
+  result.lastLaunches = result.lastLaunches or {}
   local cleanOrder = {}
   for _, accountId in ipairs(result.accountOrder or {}) do
     if type(accountId) == 'string' then cleanOrder[#cleanOrder + 1] = accountId end
@@ -55,6 +57,7 @@ for _, serverId in ipairs(favoriteOrder) do savedFavorites[serverId] = true end
 local savedServerAccounts = saved.serverAccounts
 local savedServerAccountFavorites = saved.serverAccountFavorites
 local serverLaunchSelected = saved.serverLaunchSelected or {}
+local lastLaunches = saved.lastLaunches or {}
 
 -- rx state tables are C#-backed proxies whose raw contents are empty, so json.encode
 -- misreads them as arrays and throws on their string keys. Persist plain copies only.
@@ -87,7 +90,6 @@ local state = rx:CreateState({
   alternateClients = saved.alternateClients,
   serverAccounts = savedServerAccounts,
   serverAccountFavorites = savedServerAccountFavorites,
-  selectedAccounts = {},
   expandedServers = {},
   accountId = '',
   accountUsername = '',
@@ -96,6 +98,9 @@ local state = rx:CreateState({
   accountDefaultServerId = '',
   backupPath = plugin.DataDirectory .. '/accounts.csb-backup',
   backupPassword = '',
+  removeMode = false,
+  showBackup = false,
+  addAccountOpen = false,
   revision = 0
 })
 
@@ -108,7 +113,8 @@ local function saveSettings()
     alternateClients = plainCopy(state.alternateClients),
     serverAccounts = plainCopy(state.serverAccounts or {}),
     serverAccountFavorites = plainCopy(state.serverAccountFavorites or {}),
-    serverLaunchSelected = plainCopy(serverLaunchSelected or {})
+    serverLaunchSelected = plainCopy(serverLaunchSelected or {}),
+    lastLaunches = plainCopy(lastLaunches or {})
   })
   if not ok then
     state.error = 'Could not save settings: ' .. tostring(encoded)
@@ -605,7 +611,17 @@ local function launchAccount(account, server)
   local ok, err = pcall(function()
     plugin:LaunchAccount(account.Id, serverClientPath(server), server.Endpoint)
   end)
-  if not ok then state.error = tostring(err); bump() end
+  if not ok then
+    state.error = tostring(err)
+  else
+    -- Local launch log: timestamp + server name, persisted in settings.
+    lastLaunches[account.Id] = {
+      when = os.time(),
+      serverName = server.Name or server.Endpoint
+    }
+    saveSettings()
+  end
+  bump()
 end
 
 -- Multi-launch: every server whose picker has accounts checked launches all
@@ -622,13 +638,6 @@ local function launchServerPicks()
     end
   end
   return launched
-end
-
-local function launchCheckedCurrent()
-  if state.selected == nil then state.error = 'Select a server first'; bump(); return end
-  for _, account in ipairs(state.accounts) do
-    if state.selectedAccounts[account.Id] then launchAccount(account, state.selected) end
-  end
 end
 
 local function hasLaunchableSelection()
@@ -652,6 +661,7 @@ local function beginLaunch()
     state.accountPassword = ''
     state.accountDefaultServerId = state.selected ~= nil and state.selected.Id or ''
     state.activeTab = 'accounts'
+    state.addAccountOpen = true
     state.error = ''
     bump()
     return
@@ -671,12 +681,15 @@ local function beginLaunch()
   end
   if ticked > 0 then return end
   if launchServerPicks() > 0 then return end
-  launchCheckedCurrent()
-end
-
-local function launchCheckedDefaults()
-  for _, account in ipairs(state.accounts) do
-    if state.selectedAccounts[account.Id] then launchAccount(account, findServer(account.DefaultServerId)) end
+  if accountsCount() > 0 and state.selected ~= nil then
+    -- No picks anywhere: launch the account whose default server matches the
+    -- selected server (single-account convenience only).
+    for _, account in ipairs(state.accounts) do
+      if account.DefaultServerId == state.selected.Id then
+        launchAccount(account, state.selected)
+        return
+      end
+    end
   end
 end
 
@@ -686,6 +699,7 @@ local function editAccount(account)
   state.accountAlias = account.Alias
   state.accountPassword = ''
   state.accountDefaultServerId = account.DefaultServerId or ''
+  state.addAccountOpen = true
   bump()
 end
 
@@ -714,7 +728,7 @@ end
 local function deleteAccount(account)
   local ok, err = pcall(function() plugin:DeleteAccount(account.Id) end)
   if ok then
-    state.selectedAccounts[account.Id] = nil
+    lastLaunches[account.Id] = nil
     local rank
     for index, id in ipairs(accountOrder) do
       if id == account.Id then rank = index; break end
@@ -792,10 +806,15 @@ local function ServersView()
   })
 end
 
-local function AccountRow(account)
-  local defaultServer = findServer(account.DefaultServerId)
-  return rx:Div({ class = 'account-row' }, {
-    rx:Div({ class = 'reorder-account' }, {
+local function launchLabel(account)
+  local entry = lastLaunches[account.Id]
+  if entry == nil or entry.when == nil then return 'Never launched' end
+  return 'Last launch: ' .. os.date('%b %d, %I:%M %p', entry.when) .. ' \194\183 ' .. (entry.serverName or '')
+end
+
+local function AccountRow(account, index)
+  return rx:Div({ class = { ['account-row'] = true, even = index % 2 == 0 } }, {
+    rx:Div({ class = { ['reorder-account'] = true, hidden = state.removeMode ~= true } }, {
       rx:Span('', {
         class = 'move-account',
         title = 'Move account up',
@@ -807,29 +826,63 @@ local function AccountRow(account)
         onclick = function(e) e.StopPropagation(); moveAccount(account.Id, 1) end
       }, { rx:Img({ src = '@plugins/ServerBrowser/assets/arrow-down.png' }) })
     }),
-    rx:Div({ class = 'account-name' }, {
+    -- Click the name to edit.
+    rx:Div({
+      class = 'account-main',
+      title = 'Click to edit this account',
+      onclick = function() editAccount(account) end
+    }, {
       rx:H3(account.Alias),
       rx:Span(account.Username, { class = 'muted' })
     }),
-    rx:Span(defaultServer ~= nil and defaultServer.Name or 'No default server', { class = 'account-server' }),
-    rx:Button({ onclick = function() editAccount(account) end }, 'Edit'),
-    rx:Button({ onclick = function() launchAccount(account, defaultServer) end }, 'Launch default'),
-    rx:Button({ onclick = function() launchAccount(account, state.selected) end }, 'Launch selected'),
-    rx:Button({ class = 'danger', onclick = function() deleteAccount(account) end }, 'Delete')
+    rx:Span(launchLabel(account), { class = 'account-log' }),
+    rx:Button({
+      class = { danger = true, hidden = state.removeMode ~= true },
+      title = 'Permanently remove this account',
+      onclick = function(e) e.StopPropagation(); deleteAccount(account) end
+    }, 'Delete')
   })
 end
 
 local function AccountsView()
   local rows = {}
-  for _, account in ipairs(orderedAccounts()) do rows[#rows + 1] = AccountRow(account) end
+  for index, account in ipairs(orderedAccounts()) do rows[#rows + 1] = AccountRow(account, index) end
   if #rows == 0 then rows[1] = rx:Div('No saved accounts yet.', { class = 'muted empty' }) end
   return rx:Div({ class = { tabView = true, hidden = state.activeTab ~= 'accounts' } }, {
-    rx:Div({ class = { ['account-actions'] = true, hidden = accountsCount() == 0 } }, {
-      rx:Button({ onclick = launchCheckedDefaults }, 'Launch defaults'),
-      rx:Button({ onclick = launchCheckedCurrent }, 'Launch selected')
+    rx:Div({ class = 'account-actions' }, {
+      rx:Button({
+        class = { ['actions-active'] = #state.accountId > 0 },
+        onclick = function()
+          clearAccountForm()
+          state.addAccountOpen = true
+          bump()
+        end
+      }, 'Add Account'),
+      rx:Button({
+        class = { ['actions-active'] = state.removeMode == true },
+        onclick = function()
+          state.removeMode = not state.removeMode and true or false
+          bump()
+        end
+      }, state.removeMode and 'Done Removing' or 'Remove Account'),
+      rx:Button({
+        class = { ['actions-active'] = state.showBackup == true },
+        onclick = function()
+          state.showBackup = not state.showBackup and true or false
+          bump()
+        end
+      }, 'Backup')
     }),
     rx:Div({ class = 'accounts-list' }, rows),
-    rx:Div({ class = 'account-form' }, {
+    -- Add/edit form: hidden until Add Account (or a click on an account name)
+    -- brings it up. Clicking a name enters edit mode via editAccount; the
+    -- form header reflects which mode it's in.
+    rx:Div({
+      class = {
+        ['account-form'] = true,
+        hidden = #state.accountId == 0 and state.addAccountOpen ~= true
+      }
+    }, {
       rx:H3(#state.accountId > 0 and 'Edit account' or 'Add account'),
       rx:Div({ class = 'form-row' }, {
         rx:Div({ class = 'field' }, { rx:Label('Alias'), rx:Input({ type = 'text', value = state.accountAlias, onchange = function(e) state.accountAlias = e.Params.value end }) }),
@@ -839,11 +892,12 @@ local function AccountsView()
       rx:Div({ class = 'form-row' }, {
         rx:Span('Default server: ' .. (findServer(state.accountDefaultServerId) ~= nil and findServer(state.accountDefaultServerId).Name or 'none'), { class = 'default-server' }),
         rx:Button({ onclick = function() if state.selected ~= nil then state.accountDefaultServerId = state.selected.Id; bump() end end }, 'Use selected server'),
-        rx:Button({ onclick = saveAccount }, 'Save account'),
-        rx:Button({ onclick = function() clearAccountForm(); bump() end }, 'Clear')
+        rx:Button({ onclick = function() saveAccount(); state.addAccountOpen = false; bump() end }, 'Save account'),
+        rx:Button({ onclick = function() clearAccountForm(); state.addAccountOpen = false; bump() end }, 'Cancel')
       })
     }),
-    rx:Div({ class = 'settings' }, {
+    -- Backup section: hidden until the Backup button reveals it.
+    rx:Div({ class = { settings = true, hidden = state.showBackup ~= true } }, {
       rx:H3('Client and encrypted credential backup'),
       rx:Div({ class = 'form-row' }, {
         rx:Button({ onclick = importThwarg }, 'Import from ThwargLauncher')

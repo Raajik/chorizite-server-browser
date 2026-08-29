@@ -13,7 +13,7 @@ This is a **standalone Chorizite launcher plugin**. It is intentionally separate
 
 ## Current version and status
 
-Current plugin version: **0.10.6**
+Current plugin version: **0.10.7**
 
 Verified on Windows 11 with:
 
@@ -25,9 +25,9 @@ Verified on Windows 11 with:
 
 Last verification:
 
-- 69/69 tests passing
+- 70/70 tests passing
 - build succeeds with 0 warnings and 0 errors
-- Chorizite discovers `Community Server Browser (0.10.6)`
+- Chorizite discovers `Community Server Browser (0.10.7)`
 - panel renders and live community data loads
 - TreeStats counts merge and sort correctly
 - passwords are absent from plugin JSON and persisted only in Windows Credential Manager
@@ -423,6 +423,15 @@ The repository was clean at tag `v0.8.0` / commit `d24a997`. **All four items be
    - `ServerBrowserPlugin.ImportThwargLauncher()` reads `%APPDATA%\ThwargLauncher\Accounts.txt` + newest `Profiles/*.txt`, matches Thwarg server names to the live feed by endpoint then name, and returns an "Imported N and updated M" summary. Exposed to Lua and reachable via the `Import from ThwargLauncher` button in the Accounts tab.
    - Fixture-based synthetic tests in `ThwargLauncherImporterTests.cs` (never real launcher data). Real-file schema was inspected with redacting scripts only (key names/lengths, never values).
    - RynLauncher remains unsupported (only log files were ever located; not mined).
+
+**0.10.7 — Accounts tab overhaul (2026-08-29):**
+
+- **Dead controls removed**: "Launch defaults" / "Launch selected" iterated `state.selectedAccounts`, which no UI ever wrote after the per-server pickers landed. `launchCheckedDefaults`, `launchCheckedCurrent`, and `selectedAccounts` all deleted. `beginLaunch`'s fallback now launches the account whose DefaultServerId matches the selected server.
+- **Header buttons reveal sections**: Add Account (reveals form, `state.addAccountOpen`), Remove Account (remove mode shows per-row Delete + reorder arrows), Backup (reveals backup/import section, `state.showBackup`). Active sections light the button border via `.actions-active`.
+- **Delete is deliberate**: per-row Delete hidden until remove mode. Edit = click the account name row (`editAccount` sets `addAccountOpen`).
+- **Last-launch log**: `lastLaunches[accountId] = {when, serverName}` written in `launchAccount` on success, persisted in settings.json (must be seeded in BOTH loadSettings and saveSettings, per the 0.10.4 lesson — it is). Shown as "Last launch: <date> · <server>" / "Never launched" per row; cleared on account delete. No decal plugin involved — launch-time only, no character names.
+- **Alternating account-row tints via `.even` class**, NOT `:nth-child` (unsupported, same family as `:not()`).
+- Coverage: `AccountsTabHeaderButtonsRevealSectionsAndDeleteIsDeliberate`; list height 170→260px in tests.
 
 ## Pending user request at the previous handoff
 

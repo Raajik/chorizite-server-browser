@@ -198,17 +198,23 @@
       .inner .altToggle.checked { color: #7fdb88; border-color: #7fdb88; }
 
       .account-actions { display: flex; justify-content: center; gap: 8px; margin-bottom: 6px; }
-      .accounts-list { height: 170px; overflow-y: auto; border: 1px; border-color: #80652e; }
-      .account-row { display: flex; align-items: center; padding: 5px; border-bottom: 1px; border-color: #493b20; }
+      .accounts-list { height: 260px; overflow-y: auto; border: 1px; border-color: #80652e; }
+      .account-row { display: flex; align-items: center; padding: 5px 7px; border-bottom: 1px; border-color: #493b20; }
+      .account-row.even { background-color: #12100c; }
       .reorder-account { display: flex; align-items: center; margin-right: 4px; }
       .move-account { width: 13px; height: 13px; padding: 1px; cursor: pointer; }
       .move-account:hover { background-color: #2d4757; }
       .move-account img { width: 11px; height: 11px; }
-      .account-name { width: 145px; }
-      .account-name h3 { font-size: 14px; }
-      .account-server { flex: 1; color: #8ec9e8; }
+      /* The account's name block: big alias, muted username beneath, clickable
+         to edit. Takes all the width the old button row used to eat. */
+      .account-main { flex: 1; min-width: 0; cursor: pointer; }
+      .account-main:hover h3 { color: #fff3c4; }
+      .account-main h3 { font-size: 16px; }
+      .account-log { width: 250px; margin-right: 6px; color: #8d877a; font-size: 11px; text-align: right; white-space: nowrap; overflow: hidden; }
       .inner .danger { color: #ff8787; }
       .inner .danger:hover { border-color: #ff8787; color: #ffb3b3; }
+      /* A header button whose section is open gets a lit border. */
+      .inner .actions-active { border-color: #d6a845; color: #fff3c4; }
       .empty { padding: 20px; text-align: center; }
       .account-form, .settings { border-top: 1px; border-color: #80652e; padding-top: 7px; margin-top: 7px; }
       .account-form h3, .settings h3 { margin-bottom: 5px; }
