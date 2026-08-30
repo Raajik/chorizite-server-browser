@@ -87,6 +87,8 @@ public sealed class ThwargLauncherImporter {
 
     public ThwargLauncherImporter(AccountManager accounts) => _accounts = accounts;
 
+    /// <param name="accountsTxtPath">Path to ThwargLauncher's Accounts.txt file.</param>
+    /// <param name="profileDefaults">Maps a normalized Thwarg username to the server its profile first character used.</param>
     /// <param name="resolveServerId">Maps a Thwarg server name to this plugin's server ID, or null when unmatched.</param>
     public (int Imported, int Updated) Import(
         string accountsTxtPath,

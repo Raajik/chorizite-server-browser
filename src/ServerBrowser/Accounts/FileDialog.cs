@@ -27,21 +27,21 @@ internal static class FileDialog {
         public IntPtr hInstance;
         // lpstrFilter: pairs of NUL-terminated strings, double-NUL terminated.
         public string lpstrFilter;
-        public string lpstrCustomFilter;
+        public string? lpstrCustomFilter;
         public int nMaxCustFilter;
         public int nFilterIndex;
         public IntPtr lpstrFile;
         public int nMaxFile;
         public IntPtr lpstrFileTitle;
         public int nMaxFileTitle;
-        public string lpstrInitialDir;
+        public string? lpstrInitialDir;
         public string lpstrTitle;
         public uint flags;
         // remainder of the struct is not needed; marshal the prefix only via
         // explicit size below.
         public ushort nFileOffset;
         public ushort nFileExtension;
-        public string lpstrDefExt;
+        public string? lpstrDefExt;
         public IntPtr lCustData;
         public IntPtr lpfnHook;
         public IntPtr lpTemplateName;

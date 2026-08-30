@@ -13,7 +13,7 @@ This is a **standalone Chorizite launcher plugin**. It is intentionally separate
 
 ## Current version and status
 
-Current plugin version: **0.10.11**
+Current plugin version: **0.11.0**
 
 Verified on Windows 11 with:
 
@@ -25,9 +25,10 @@ Verified on Windows 11 with:
 
 Last verification:
 
-- 73/73 tests passing
+- 80/80 tests passing
 - build succeeds with 0 warnings and 0 errors
-- Chorizite discovers `Community Server Browser (0.10.11)`
+- the UDP login-handshake probe was audited live against all 47 community endpoints (see the measured reality table below) before the packet format was pinned by tests
+- Chorizite discovers `Community Server Browser (0.11.0)`
 - panel renders and live community data loads
 - TreeStats counts merge and sort correctly
 - passwords are absent from plugin JSON and persisted only in Windows Credential Manager
@@ -99,7 +100,9 @@ If the network fetch fails, cached community XML is used. Player-count failure i
 - emulator/type/status stacked vertically in a 72px column at 10px type
 - population and ping in a bordered 66px cube, ping in its own band beneath a divider
 - centered title and separate Servers/Accounts tabs
-- ICMP latency shown beside population (`N/A` when the host blocks ping)
+- ping shown beside population: an AC UDP login-handshake probe against the real game
+  endpoint first (a reply is genuine game-port reachability with true latency), then an
+  ICMP fallback when the handshake gets no reply, then `N/A`
 - red `Offline` instead of `N/A` when the host name no longer resolves
 - toggleable star favorites persisted by server ID
 - favorites pinned above the feed as compact single-line cards
@@ -166,8 +169,20 @@ Using endpoint as a fallback ID is important: blank/duplicate IDs can cause ambi
   - `ExternalLink` is the single `Process.Start` path
 
 - `src/ServerBrowser/Feeds/ServerPingProbe.cs`
-  - bounded concurrent ICMP probes
-  - unavailable results remain nullable and render as `N/A`
+  - two-stage reachability probe: AC UDP login handshake first, ICMP fallback second
+  - prefers the IPv4 (A record) address for both stages — the AC client only speaks IPv4
+  - DNS failure stays `HostResolved = false` and renders as a red `Offline`
+  - bounded concurrent probes; unavailable results remain nullable and render as `N/A`
+
+- `src/ServerBrowser/Feeds/ServerLoginProbe.cs`
+  - speaks the AC UDP login handshake (the ThwargLauncher-era "server tracker" ping) to
+    the actual game endpoint — one fixed 80-byte packet per endpoint per refresh
+  - the reserved `acservertracker` login account means no credentials are sent, no
+    account row is touched, and ACE tears the session down immediately; GDLE answers
+    any datagram
+  - implements the exact packet checksum rule (see the protocol notes in 0.11.0 below)
+  - a reply, a timeout, and an ICMP port-unreachable all resolve to "resolved host, no
+    latency" so the caller can fall back to ICMP; the probe never throws upward
 
 ### Account and credential layer
 
@@ -214,6 +229,9 @@ If the Windows profile is lost, Credential Manager entries are not independently
 - `scripts/make_discord_icon.py`, `make_web_icon.py`, `make_star_icons.py`, `make_arrow_icons.py`
   - reproducibly generate the bundled icons (requires Pillow)
   - `make_discord_icon.py` additionally needs `svglib reportlab rlPyCairo pycairo`, because it rasterises Discord's official Clyde path rather than approximating it
+- `scripts/udp_handshake_probe.ps1`
+  - re-runs the live UDP login-handshake audit against the plugin's cached feed and
+    prints per-endpoint handshake/ICMP results (the source of the measured-reality tables)
 
 Hand-drawn approximations of the Discord mark were tried first and consistently read as a ghost or a pair of speech bubbles at 14px. The silhouette depends on curve detail that primitives cannot reproduce at that size, so the official path is rasterised at 224px, cropped to its ink, and downsampled. Icons are white on transparency; the badge CSS supplies the colour.
 
@@ -345,6 +363,18 @@ dotnet build src/ServerBrowser/ServerBrowser.csproj
 - population of nullable latency on server listings
 - unresolvable hosts reported as `HostResolved = false` with no latency
 
+`tests/ServerBrowser.Tests/ServerLoginProbeTests.cs`
+
+- packet layout: 20-byte header + 60-byte payload, Size field, zero sequence/iteration
+- LoginRequest flag and the reserved tracker account / client version in the payload
+- 16L string encoding and four-byte padding
+- the checksum rule (header hash + payload hash), pinned to the live-verified golden
+  value `0xAD23481C`
+- loopback server that validates the checksum exactly the way ACE's `VerifyCRC` does
+  and answers, proving the packet passes a faithful ACE receive path
+- silent game port resolves to resolved-host/null-latency (ICMP fallback territory)
+- `MeasureAsync` falls back to ICMP when the handshake gets no reply
+
 ## Runtime verification
 
 Chorizite logs to:
@@ -363,7 +393,10 @@ The unrelated `TestPlugin` texture warning comes from Chorizite's plugin index/U
 ## Known limitations
 
 - Discord badges open only validated `https://discord.gg/...` links through the Windows default URL handler. The badge click stops propagation so it does not change the selected server.
-- Ping uses ICMP rather than the AC game port (the game endpoint is not a TCP listener). Servers that block ICMP correctly show `N/A`.
+- Ping is now a two-stage probe: the AC UDP login handshake against the game endpoint
+  first, then an ICMP fallback. What it cannot do is distinguish "server down" from
+  "handshake silently filtered" — for the four hosts that answer ICMP but not the
+  handshake, the card shows the machine's ICMP latency rather than a false "down" claim.
 
 ### Measured ICMP reality of the community list
 
@@ -378,11 +411,30 @@ All 43 unique hosts were probed directly with a 3 second budget and three attemp
 
 Roughly half the list therefore cannot show a latency number, and that is the servers' behaviour rather than a plugin defect.
 
-The slowest successful reply was **127 ms** and no successful DNS lookup exceeded **106 ms**, so the 750 ms budget in `ServerFeedClient` is already generous. Raising it does not recover any host; the silent ones stay silent at 3 seconds. Do not "fix" missing pings by increasing the timeout.
+The slowest successful ICMP reply was **127 ms** and no successful DNS lookup exceeded **106 ms**, so the 750 ms budget in `ServerFeedClient` is already generous. Raising it does not recover any host; the silent ones stay silent at 3 seconds. Do not "fix" missing pings by increasing the timeout.
 
 Hosts that fail DNS are reported separately as `Offline`, because that indicates a genuinely stale listing rather than a firewall policy.
 
-Meaningful reachability for the silent majority would require speaking AC's UDP login handshake the way ThwargLauncher does, which is a much larger protocol job.
+### Measured UDP login-handshake reality of the community list
+
+All 47 unique endpoints (2026-08-30, `scripts/udp_handshake_probe.ps1`) were probed with
+the tracker login packet and compared against ICMP on the same hosts:
+
+| Result | Endpoints |
+| --- | --- |
+| Handshake reply (game port genuinely answering) | 38 |
+| No handshake reply (4 of the 6 answered ICMP: machine up, game port down) | 6 |
+| DNS failure | 3 |
+
+The handshake recovers real latency for **15 endpoints where ICMP is timed-out or
+unreachable** (FrostfACE, Derptide, Jellocull, ACPrime, Drunkenfell, Eversong, Frostcull,
+Buadren, Mistwood, Morgentau, both Serafino worlds, The Tower, Shadowland, Asheron4Fun),
+which is exactly the population the ICMP table above counted as invisible. Four hosts
+answer ICMP but not the handshake (Nexus, NoESCapeGames, Newfoundland, GDLE Test), where
+the ICMP fallback still shows their machine latency rather than inventing a "down" state
+from a probe edge case. Slowest successful UDP reply: **177 ms**, so the 900 ms handshake
+budget is generous; the 750 ms feed budget is untouched.
+
 - Account backup/export currently uses a typed path rather than a native file-picker dialog.
 - TreeStats name matching is exact except for case; aliases such as `ACPrime` versus `Asheron Prime` will not automatically match.
 - There is no manual refresh button by design; the panel loads automatically and uses cache fallback.
@@ -461,6 +513,46 @@ The repository was clean at tag `v0.8.0` / commit `d24a997`. **All four items be
 - Fix: revert `body`/`.inner`/`.tabView` to auto height; give `.accounts-list` a **fixed height (462px)** so the action bar lands at the window bottom arithmetically. Lesson: in this launcher, an RmlUi `body` is NOT a sized box — never rely on `height: 100%`/`flex: 1` chains from `body`; use explicit pixel heights.
 - Regression guard: `FixedWindowLayoutUsesCompactWidthsAndHeights` now pins the 462px list and forbids `body { width: 780px; height:`.
 
+**0.11.0 — AC UDP login-handshake probe (2026-08-30):**
+
+- **Game-port reachability instead of ICMP guesswork**: `ServerLoginProbe` sends the AC
+  UDP login handshake to each feed endpoint before falling back to ICMP. A reply is a
+  genuine "this server is up and accepting connections" with true latency; measured live,
+  38/47 community endpoints reply, including all 15 hosts ICMP could not see.
+- **The wire format is the community "server tracker" ping**: a 20-byte header
+  (Sequence 0, Flags = LoginRequest 0x00010000, Checksum, Id 0, Time 0, Size, Iteration 0)
+  plus a 60-byte login payload whose NetAuthType is 0 (no credentials) and whose account
+  is the reserved `acservertracker:jj9h26hcsggc` (28 characters, not 29; counting it
+  wrong shifts the 16L padding). ACE recognizes that account, answers with a
+  ConnectResponse packet, and tears the session down immediately: no credentials travel,
+  no account row is read or written, nothing appears in server logs at info level. GDLE
+  answers any datagram. Sources: ACE `PacketHeader`, `PacketHeaderOptional`,
+  `ClientPacket.VerifyCRC`, `NetworkSession.HandlePacket`, `AuthenticationHandler`.
+- **The checksum rule that cost the afternoon**: ACE folds the ENTIRE login payload into
+  the optional-header checksum for LoginRequest packets (`PacketHeaderOptional.Unpack`
+  writes the whole payload into `headerBytes`), so
+  `Checksum = Hash32(header with Checksum := 0xBADD70DD, 20) + Hash32(payload, len)`.
+  A checksum that only covers the header is silently dropped by every ACE server while
+  GDLE still replies, which made the first live audit look like "ACE servers are all
+  down". `Hash32` is AC's own hash: length in the high word, then little-endian u32 words
+  summed in. The fixed packet's golden checksum `0xAD23481C` is pinned by
+  `ChecksumCoversHeaderAndPayloadPerTheAceLoginRule` and was verified against the live
+  list before being pinned.
+- **Bare ConnectRequest (0x00040000) gets no reply on ACE**: the C2S listener only
+  creates sessions for the LoginRequest flag; anything else is looked up in
+  `sessionMap[Header.Id]` and dropped as unsolicited for a new endpoint.
+- **Sequence 0 is explicitly tolerated during connect** (ACE's reordering stage exempts
+  it); Id is ignored for LoginRequest packets.
+- **UI is untouched**: the probe only fills the existing `PingMs`/`HostResolved` fields,
+  so the stable-child-tree and single-handler RmlUi invariants are not exercised. The
+  DNS-failure red `Offline` and ICMP-fallback `N/A` semantics are unchanged.
+- **Reproducible audit**: `scripts/udp_handshake_probe.ps1` re-runs the live measurement
+  against the plugin's cached feed.
+- Coverage: `ServerLoginProbeTests` (packet layout, 16L string padding, the checksum
+  rule, loopback handshake reply, silent-port timeout, ICMP fallback integration).
+- Also fixed 5 pre-existing build warnings (FileDialog nullable struct fields,
+  ThwargLauncherImporter XML doc params) to restore the 0-warning bar.
+
 ## Pending user request at the previous handoff
 
 (Completed — see above.)
@@ -469,12 +561,13 @@ The repository was clean at tag `v0.8.0` / commit `d24a997`. **All four items be
 
 Priority order:
 
-1. Consider an AC UDP handshake probe so ICMP-silent servers can still show real reachability.
-2. Add tested TreeStats alias mapping for known name mismatches.
-3. Add a native file-picker bridge for encrypted account backup import/export.
-4. Add recent servers without storing additional credentials.
-5. Consider replacing Chorizite's original simple login screen entirely, rather than showing Server Browser as a separate panel, only if this can be done without coupling to private Launcher plugin internals.
-6. Package/publish the plugin in Raajik's GitHub repository and optionally submit it to Chorizite's plugin index.
+1. Add tested TreeStats alias mapping for known name mismatches (the live TreeStats feed
+   contains names such as `ACEmulator` and `BartleSkeetHG` that no feed entry bears).
+2. Add a native file-picker bridge for encrypted account backup import/export (the
+   proven `GetOpenFileNameW` pattern from the alternate-client dialog applies directly).
+3. Add recent servers without storing additional credentials.
+4. Consider replacing Chorizite's original simple login screen entirely, rather than showing Server Browser as a separate panel, only if this can be done without coupling to private Launcher plugin internals.
+5. Package/publish the plugin in Raajik's GitHub repository and optionally submit it to Chorizite's plugin index.
 
 ## Repository state at handoff
 

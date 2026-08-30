@@ -8,6 +8,7 @@ public class ServerPingProbeTests {
     public async Task MeasureAsyncReturnsIcmpLatencyForReachableHost() {
         var result = await ServerPingProbe.MeasureAsync(
             "127.0.0.1",
+            port: 9000,
             TimeSpan.FromSeconds(1));
 
         Assert.True(result.HostResolved);
@@ -19,6 +20,7 @@ public class ServerPingProbeTests {
     public async Task MeasureAsyncReportsUnresolvableHostsSeparatelyFromSilentOnes() {
         var result = await ServerPingProbe.MeasureAsync(
             "server-browser-no-such-host.invalid",
+            port: 9000,
             TimeSpan.FromSeconds(1));
 
         Assert.False(result.HostResolved);
