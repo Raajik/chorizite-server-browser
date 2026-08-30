@@ -240,7 +240,7 @@ public class UiStructureTests {
         var rml = ReadRml();
 
         Assert.Contains("body { width: 780px", rml);
-        Assert.Contains(".accounts-list { flex: 1", rml);
+        Assert.Contains(".accounts-list { height: 462px", rml);
         Assert.DoesNotContain("Launch checked on selected server", lua);
         Assert.DoesNotContain("Launch checked defaults", lua);
     }
@@ -264,6 +264,9 @@ public class UiStructureTests {
         Assert.Contains(".bottom-card {", rml);
         Assert.Matches(@"\.bottom-card \{[^}]*position: absolute", rml);
         Assert.Matches(@"\.accounts-wrap \{[^}]*position: relative", rml);
+        // The list is explicitly sized; body-level flex height didn't survive
+        // the launcher's window sizing, so don't reintroduce it blindly.
+        Assert.DoesNotContain("body { width: 780px; height:", rml);
     }
 
     [Fact]

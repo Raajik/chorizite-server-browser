@@ -4,9 +4,8 @@
     <script src="server-browser.lua"></script>
     <style>
       * { box-sizing: border-box; }
-      body { width: 780px; height: 630px; margin: 0 auto; font-family: Tahoma; color: #eee; }
-      .inner { background-color: #080808; padding: 8px; height: 100%; display: flex; flex-direction: column; }
-      .tabView { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+      body { width: 780px; margin: 0 auto; font-family: Tahoma; color: #eee; }
+      .inner { background-color: #080808; padding: 8px; }
       h2 { color: #d6a845; margin: 1px 0 5px 0; font-size: 20px; text-align: center; }
       h3 { color: #efd07d; margin: 0; }
       /* Flat controls. theme.rcss skins every button with a ninepatch decorator at
@@ -199,9 +198,10 @@
       .inner .altToggle.checked { color: #7fdb88; border-color: #7fdb88; }
 
       .account-actions { display: flex; justify-content: center; gap: 8px; margin-top: 6px; }
-      /* The list fills the tab; the open bottom card overlaps its last rows. */
-      .accounts-wrap { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
-      .accounts-list { flex: 1; min-height: 260px; overflow-y: auto; border: 1px; border-color: #80652e; }
+      /* The list is sized so the action bar lands at the window's bottom;
+         the open bottom card overlaps its last rows. */
+      .accounts-wrap { position: relative; }
+      .accounts-list { height: 462px; overflow-y: auto; border: 1px; border-color: #80652e; }
       .account-row { display: flex; align-items: center; padding: 2px 7px; min-height: 24px; border-bottom: 1px; border-color: #493b20; }
       .account-row.even { background-color: #12100c; }
       .reorder-account { display: none; }

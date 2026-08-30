@@ -13,7 +13,7 @@ This is a **standalone Chorizite launcher plugin**. It is intentionally separate
 
 ## Current version and status
 
-Current plugin version: **0.10.10**
+Current plugin version: **0.10.11**
 
 Verified on Windows 11 with:
 
@@ -27,7 +27,7 @@ Last verification:
 
 - 73/73 tests passing
 - build succeeds with 0 warnings and 0 errors
-- Chorizite discovers `Community Server Browser (0.10.10)`
+- Chorizite discovers `Community Server Browser (0.10.11)`
 - panel renders and live community data loads
 - TreeStats counts merge and sort correctly
 - passwords are absent from plugin JSON and persisted only in Windows Credential Manager
@@ -454,6 +454,12 @@ The repository was clean at tag `v0.8.0` / commit `d24a997`. **All four items be
 - **Alias ↔ Description toggle** in the add/edit card (altToggle pattern). Description mode renders the value small grey (`.account-alias.alias-description`, 11px normal weight); mode inferred per row by `#alias > 20`. Aliases equal to the username are hidden from the row (no duplication).
 - **Full-height tab layout**: `body` gets `height: 630px`, `.inner` and `.tabView` are flex columns, so the accounts list stretches to the bottom action bar — no dead space. `.servers` tab keeps its fixed 420px list.
 - **RCSS gotcha**: the new `.tabView.hidden` rule tripped `HiddenRuleIsDeclaredLastSoItBeatsTagDisplay` (test finds the FIRST `.hidden { display: none; }`-ish rule vs `.tag`); all `display: none` rules must live in the bottom block.
+
+**0.10.11 — Fix: action bar embedded in first account row (2026-08-29):**
+
+- The 0.10.10 flex chain (`body` 630px → `.inner` → `.tabView` → list `flex: 1`) **broke live**: the launcher window does not give `body` a real height, so the accounts list wrapper collapsed to ~1 row height; the `position: relative` wrapper placed the absolute action bar over account #1 and the list overflowed past it (user screenshot).
+- Fix: revert `body`/`.inner`/`.tabView` to auto height; give `.accounts-list` a **fixed height (462px)** so the action bar lands at the window bottom arithmetically. Lesson: in this launcher, an RmlUi `body` is NOT a sized box — never rely on `height: 100%`/`flex: 1` chains from `body`; use explicit pixel heights.
+- Regression guard: `FixedWindowLayoutUsesCompactWidthsAndHeights` now pins the 462px list and forbids `body { width: 780px; height:`.
 
 ## Pending user request at the previous handoff
 
